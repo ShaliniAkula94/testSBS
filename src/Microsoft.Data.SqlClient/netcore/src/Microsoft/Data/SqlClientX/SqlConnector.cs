@@ -8,6 +8,8 @@ using System;
 using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClientX.Handlers.Connection;
 
 #nullable enable
 
@@ -16,17 +18,34 @@ namespace Microsoft.Data.SqlClientX
     /// <summary>
     /// Represents a physical connection with the database.
     /// </summary>
-    internal class SqlConnector
+    internal sealed class SqlConnector
     {
-        private static int SpoofedServerProcessId = 1;
+        private static int s_spoofedServerProcessId = 1;
+
+        private readonly ConnectionHandlerContext _connectionHandlerContext;
 
         internal SqlConnector(SqlConnectionX? owningConnection, SqlDataSource dataSource)
         {
             OwningConnection = owningConnection;
             DataSource = dataSource;
+
             //TODO: Set this based on the real server process id.
             //We only set this in client code right now to simulate different processes and to differentiate internal connections.
-            ServerProcessId = Interlocked.Increment(ref SpoofedServerProcessId);
+            ServerProcessId = Interlocked.Increment(ref s_spoofedServerProcessId);
+
+            // TODO enable parser registration with Parser introduction.
+            var connString = new SqlConnectionString(dataSource.ConnectionString);
+
+            _connectionHandlerContext = new ConnectionHandlerContext()
+            {
+                ServerInfo = new SqlClient.ServerInfo(connString),
+                ConnectionString = connString,
+                // TODO Need clarity:
+                // HOW TO DETERMINE WHICH PROPERTIES ARE REQUIRED TO BE SET TO INITIATE LOGIN FLOW
+
+                // TODO initialize and pass SqlDataSource into connection handler context
+                // TODO initialize and pass ConnectionOptions into connection handler context
+            };
         }
 
         #region properties
@@ -76,20 +95,11 @@ namespace Microsoft.Data.SqlClientX
         /// <exception cref="NotImplementedException"></exception>
         internal ValueTask Open(TimeSpan timeout, bool isAsync, CancellationToken cancellationToken)
         {
-            //TODO: Simulates the work that will be done to open the connection.
-            //Remove when open is implemented.
-
-            if (isAsync)
-            {
-                Task WaitTask = Task.Delay(200);
-                return new ValueTask(WaitTask);
-            }
-            else
-            {
-                Thread.Sleep(200);
-                return ValueTask.CompletedTask;
-            }
+            return ConnectionHandlerOrchestrator.ProcessRequestAsync(_connectionHandlerContext, isAsync, cancellationToken);
         }
+
+        // TODO Implement Break Connection workflow.
+        internal void BreakConnection() => throw new NotImplementedException();
 
         /// <summary>
         /// Returns this connection to the data source that generated it.

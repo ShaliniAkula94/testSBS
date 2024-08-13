@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using System.Transactions;
 using Microsoft.Data.Common;
 using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClientX.Tds.State;
 
 #nullable enable
 
@@ -25,10 +26,10 @@ namespace Microsoft.Data.SqlClientX
     /// </summary>
     [DefaultEvent("InfoMessage")]
     [DesignerCategory("")]
-    internal sealed class SqlConnectionX : DbConnection, ICloneable
+    internal sealed class SqlConnectionX : DbConnection, ICloneable, ITdsEventListener
     {
         #region private
-        private static readonly SqlConnectionString DefaultSettings = new SqlConnectionString("");
+        private static readonly SqlConnectionString DefaultSettings = new("");
 
         private SqlCredential? _credential;
         private SqlDataSource? _dataSource;
@@ -38,7 +39,9 @@ namespace Microsoft.Data.SqlClientX
 
         //TODO: Investigate if we can just use dataSource.ConnectionString. Do this when this class can resolve its own data source.
         private string _connectionString = string.Empty;
-        
+
+        private bool _fireInfoMessageEventOnUserErrors; // False by default
+
         private ConnectionState _connectionState = ConnectionState.Closed;
         #endregion
 
@@ -138,6 +141,24 @@ namespace Microsoft.Data.SqlClientX
         /// <inheritdoc/>
         public override bool CanCreateBatch
             => throw new NotImplementedException();
+
+        #endregion
+
+        #region Public events
+
+        /// <include file='../../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlConnection.xml' path='docs/members[@name="SqlConnection"]/InfoMessage/*' />
+        [ResCategory(StringsHelper.ResourceNames.DataCategory_InfoMessage)]
+        [ResDescription(StringsHelper.ResourceNames.DbConnection_InfoMessage)]
+        // TODO Investigate if making InfoMessage nullable is safe for SqlConnection public API contract?
+        // Handle the nullable requirement alternatively if needed.
+        public event SqlInfoMessageEventHandler? InfoMessage;
+
+        /// <include file='../../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlConnection.xml' path='docs/members[@name="SqlConnection"]/FireInfoMessageEventOnUserErrors/*' />
+        public bool FireInfoMessageEventOnUserErrors
+        {
+            get => _fireInfoMessageEventOnUserErrors;
+            set => _fireInfoMessageEventOnUserErrors = value;
+        }
 
         #endregion
 
@@ -285,14 +306,14 @@ namespace Microsoft.Data.SqlClientX
         /// <inheritdoc/>
         public override Task OpenAsync(CancellationToken cancellationToken) => Open(true, cancellationToken);
 
-        internal async Task Open(bool async, CancellationToken cancellationToken)
+        internal async Task Open(bool isAsync, CancellationToken cancellationToken)
         {
             if (_dataSource == null)
             {
                 throw ADP.NoConnectionString();
             }
 
-            _internalConnection = await _dataSource.GetInternalConnection(this, TimeSpan.FromSeconds(ConnectionTimeout), async, cancellationToken).ConfigureAwait(false);
+            _internalConnection = await _dataSource.GetInternalConnection(this, TimeSpan.FromSeconds(ConnectionTimeout), isAsync, cancellationToken).ConfigureAwait(false);
             _connectionState = ConnectionState.Open;
         }
 
@@ -313,6 +334,35 @@ namespace Microsoft.Data.SqlClientX
         /// <inheritdoc/>
         protected override DbCommand CreateDbCommand()
             => throw new NotImplementedException();
+
+        #region internal helpers
+
+        void ITdsEventListener.OnInfoMessage(SqlInfoMessageEventArgs sqlInfoMessageEventArgs, out bool notified)
+        {
+            // TODO review event source traces later
+            // SqlClientEventSource.Log.TryTraceEvent("SqlConnection.OnInfoMessage | API | Info | Object Id {0}, Message '{1}'", ObjectID, sqlInfoMessageEventArgs.Message);
+            SqlInfoMessageEventHandler? handler = InfoMessage;
+            if (null != handler)
+            {
+                notified = true;
+                try
+                {
+                    handler(this, sqlInfoMessageEventArgs);
+                }
+                catch (Exception e)
+                {
+                    if (!ADP.IsCatchableOrSecurityExceptionType(e))
+                    {
+                        throw;
+                    }
+                }
+            }
+            else
+            {
+                notified = false;
+            }
+        }
+        #endregion
     }
 }
 
