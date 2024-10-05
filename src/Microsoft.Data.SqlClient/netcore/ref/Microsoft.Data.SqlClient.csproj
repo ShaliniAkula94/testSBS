@@ -8,6 +8,7 @@
     <Product>Core $(BaseProduct)</Product>
     <Configurations>Debug;Release;</Configurations>
     <TargetGroup Condition="'$([MSBuild]::GetTargetFrameworkIdentifier($(TargetFramework)))'=='.NETCoreApp'">netcoreapp</TargetGroup>
+    <DefineConstants Condition="'$(IsAzureEnabled)' == 'true'">$(DefineConstants);AZURE_SUPPORT_ENABLED</DefineConstants>
     <Platforms>AnyCPU;x64;x86</Platforms>
   </PropertyGroup>
    <!--Generating Strong Name-->
@@ -26,7 +27,7 @@
     <Compile Include="..\..\ref\Microsoft.Data.SqlClient.Batch.cs" />
     <Compile Include="..\..\ref\Microsoft.Data.SqlClient.Batch.NetCoreApp.cs" />
   </ItemGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(IsAzureEnabled)' == 'true'">
     <PackageReference Include="Azure.Identity" Version="$(AzureIdentityVersion)" />
   </ItemGroup>
 </Project>

@@ -17,7 +17,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Common;
 using Microsoft.Data.ProviderBase;
+#if AZURE_SUPPORT_ENABLED
 using Microsoft.Identity.Client;
+#endif
 using System.Transactions;
 
 
@@ -139,8 +141,9 @@ namespace Microsoft.Data.SqlClient
         internal readonly Func<SqlAuthenticationParameters, CancellationToken,Task<SqlAuthenticationToken>> _accessTokenCallback;
 
         private readonly ActiveDirectoryAuthenticationTimeoutRetryHelper _activeDirectoryAuthTimeoutRetryHelper;
+#if AZURE_SUPPORT_ENABLED
         private readonly SqlAuthenticationProviderManager _sqlAuthenticationProviderManager;
-
+#endif
         // Certificate auth calbacks.
         ServerCertificateValidationCallback _serverCallback;
         ClientCertificateRetrievalCallback _clientCallback;
@@ -496,8 +499,9 @@ namespace Microsoft.Data.SqlClient
             _accessTokenCallback = accessTokenCallback;
 
             _activeDirectoryAuthTimeoutRetryHelper = new ActiveDirectoryAuthenticationTimeoutRetryHelper();
+#if AZURE_SUPPORT_ENABLED
             _sqlAuthenticationProviderManager = SqlAuthenticationProviderManager.Instance;
-
+#endif
             _serverCallback = serverCallback;
             _clientCallback = clientCallback;
             _originalNetworkAddressInfo = originalNetworkAddressInfo;
@@ -1571,7 +1575,10 @@ namespace Microsoft.Data.SqlClient
 
             login.useReplication = ConnectionOptions.Replication;
             login.useSSPI = ConnectionOptions.IntegratedSecurity  // Treat AD Integrated like Windows integrated when against a non-FedAuth endpoint
-                                     || (ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated && !_fedAuthRequired);
+#if AZURE_SUPPORT_ENABLED
+                            || (ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated && !_fedAuthRequired)
+#endif
+                                     ;
             login.packetSize = _currentPacketSize;
             login.newPassword = newPassword;
             login.readOnlyIntent = ConnectionOptions.ApplicationIntent == ApplicationIntent.ReadOnly;
@@ -1591,17 +1598,20 @@ namespace Microsoft.Data.SqlClient
             // If the workflow being used is Active Directory Authentication and server's prelogin response
             // for FEDAUTHREQUIRED option indicates Federated Authentication is required, we have to insert FedAuth Feature Extension
             // in Login7, indicating the intent to use Active Directory Authentication for SQL Server.
-            if (ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryPassword
-                || ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryInteractive
-                || ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryServicePrincipal
-                || ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryDeviceCodeFlow
-                || ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryManagedIdentity
-                || ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryMSI
-                || ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryDefault
-                || ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity
+            if (
+#if AZURE_SUPPORT_ENABLED
+                ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryPassword ||
+                ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryInteractive ||
+                ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryServicePrincipal ||
+                ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryDeviceCodeFlow ||
+                ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryManagedIdentity ||
+                ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryMSI ||
+                ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryDefault ||
+                ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity ||
                 // Since AD Integrated may be acting like Windows integrated, additionally check _fedAuthRequired
-                || (ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated && _fedAuthRequired)
-                || _accessTokenCallback != null)
+                (ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated && _fedAuthRequired) ||
+#endif
+                 _accessTokenCallback != null)
             {
                 requestedFeatures |= TdsEnums.FeatureExtension.FedAuth;
                 _federatedAuthenticationInfoRequested = true;
@@ -1989,16 +1999,19 @@ namespace Microsoft.Data.SqlClient
         {
             Boolean isAzureEndPoint = ADP.IsAzureSqlServerEndpoint(connectionOptions.DataSource);
 
-            Boolean isFedAuthEnabled = this._accessTokenInBytes != null ||
-                                       connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryPassword ||
-                                       connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated ||
-                                       connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryInteractive ||
-                                       connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryServicePrincipal ||
-                                       connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryDeviceCodeFlow ||
-                                       connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryManagedIdentity ||
-                                       connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryMSI ||
-                                       connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryDefault ||
-                                       connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity;
+            Boolean isFedAuthEnabled = this._accessTokenInBytes != null
+#if AZURE_SUPPORT_ENABLED
+                                       || connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryPassword
+                                       || connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated
+                                       || connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryInteractive
+                                       || connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryServicePrincipal
+                                       || connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryDeviceCodeFlow
+                                       || connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryManagedIdentity
+                                       || connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryMSI
+                                       || connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryDefault
+                                       || connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity
+#endif
+                                       ;
 
             // Check if the user had explicitly specified the TNIR option in the connection string or the connection string builder.
             // If the user has specified the option in the connection string explicitly, then we shouldn't disable TNIR.
@@ -2588,14 +2601,16 @@ namespace Microsoft.Data.SqlClient
             Debug.Assert((ConnectionOptions._hasUserIdKeyword && ConnectionOptions._hasPasswordKeyword)
                          || _credential != null
                          || _accessTokenCallback != null
+#if AZURE_SUPPORT_ENABLED
                          || ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryInteractive
                          || ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryManagedIdentity
                          || ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryMSI
                          || ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryDefault
                          || ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity
                          || ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryDeviceCodeFlow
-                         || (ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated && _fedAuthRequired),
-                         "Credentials aren't provided for calling MSAL");
+                         || (ConnectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated && _fedAuthRequired)
+#endif
+                         , "Credentials aren't provided for calling MSAL");
             Debug.Assert(fedAuthInfo != null, "info should not be null.");
             Debug.Assert(_dbConnectionPoolAuthenticationContextKey == null, "_dbConnectionPoolAuthenticationContextKey should be null.");
             SqlClientEventSource.Log.TryTraceEvent("<sc.SqlInternalConnectionTds.OnFedAuthInfo> {0}, Generating federated authentication token", ObjectID);
@@ -2793,9 +2808,11 @@ namespace Microsoft.Data.SqlClient
             // Username to use in error messages.
             string username = null;
 
+#if AZURE_SUPPORT_ENABLED
             var authProvider = _sqlAuthenticationProviderManager.GetProvider(ConnectionOptions.Authentication);
             if (authProvider == null && _accessTokenCallback == null)
                 throw SQL.CannotFindAuthProvider(ConnectionOptions.Authentication.ToString());
+#endif
 
             // retry getting access token once if MsalException.error_code is unknown_error.
             // extra logic to deal with HTTP 429 (Retry after).
@@ -2814,6 +2831,7 @@ namespace Microsoft.Data.SqlClient
                         .WithConnectionTimeout(ConnectionOptions.ConnectTimeout);
                     switch (ConnectionOptions.Authentication)
                     {
+#if AZURE_SUPPORT_ENABLED
                         case SqlAuthenticationMethod.ActiveDirectoryIntegrated:
                             username = TdsEnums.NTAUTHORITYANONYMOUSLOGON;
                             if (_activeDirectoryAuthTimeoutRetryHelper.State == ActiveDirectoryAuthenticationTimeoutRetryState.Retrying)
@@ -2868,6 +2886,7 @@ namespace Microsoft.Data.SqlClient
                                 _activeDirectoryAuthTimeoutRetryHelper.CachedToken = _fedAuthToken;
                             }
                             break;
+#endif
                         default:
                             if (_accessTokenCallback == null)
                             {
@@ -2904,7 +2923,7 @@ namespace Microsoft.Data.SqlClient
                     }
 
                     Debug.Assert(_fedAuthToken.accessToken != null, "AccessToken should not be null.");
-#if DEBUG
+#if DEBUG && AZURE_SUPPORT_ENABLED
                     if (_forceMsalRetry)
                     {
                         // 3399614468 is 0xCAA20004L just for testing.
@@ -2914,6 +2933,7 @@ namespace Microsoft.Data.SqlClient
                     // Break out of the retry loop in successful case.
                     break;
                 }
+#if AZURE_SUPPORT_ENABLED
                 // Deal with Msal service exceptions first, retry if 429 received.
                 catch (MsalServiceException serviceException)
                 {
@@ -2964,6 +2984,7 @@ namespace Microsoft.Data.SqlClient
                     Thread.Sleep(sleepInterval);
                     sleepInterval *= 2;
                 }
+#endif
                 // All other exceptions from MSAL/Azure Identity APIs
                 catch (Exception e)
                 {

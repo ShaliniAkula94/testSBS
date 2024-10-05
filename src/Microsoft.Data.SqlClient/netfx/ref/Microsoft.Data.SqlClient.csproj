@@ -6,6 +6,7 @@
     <OutputPath>$(BinFolder)$(Configuration)\$(AssemblyName)\ref\</OutputPath>
     <DocumentationFile>$(OutputPath)\Microsoft.Data.SqlClient.xml</DocumentationFile>
     <Product>Framework $(BaseProduct)</Product>
+    <DefineConstants Condition="'$(IsAzureEnabled)' == 'true'">$(DefineConstants);AZURE_SUPPORT_ENABLED</DefineConstants>
     <Configurations>Debug;Release;</Configurations>
   </PropertyGroup>
     <!--Generating Strong Name-->
@@ -23,8 +24,9 @@
   <ItemGroup>
     <Reference Include="System.EnterpriseServices" />
     <Reference Include="System.Transactions" />
+    <PackageReference Include="System.Text.Json" Version="$(SystemTextJsonVersion)" />
   </ItemGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(IsAzureEnabled)' == 'true'">
     <PackageReference Include="Azure.Identity" Version="$(AzureIdentityVersion)" />
   </ItemGroup>
 </Project>

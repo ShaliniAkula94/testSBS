@@ -596,6 +596,7 @@ namespace Microsoft.Data.SqlClient
                 throw SQL.AuthenticationAndIntegratedSecurity();
             }
 
+#if AZURE_SUPPORT_ENABLED
             if (Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated && _hasPasswordKeyword)
             {
                 throw SQL.IntegratedWithPassword();
@@ -630,7 +631,7 @@ namespace Microsoft.Data.SqlClient
             {
                 throw SQL.NonInteractiveWithPassword(DbConnectionStringBuilderUtil.ActiveDirectoryWorkloadIdentityString);
             }
-
+#endif
 #if ADONET_CERT_AUTH && NETFRAMEWORK
 
             if (!DbConnectionStringBuilderUtil.IsValidCertificateValue(_certificate))

@@ -33,6 +33,9 @@
     <MicrosoftExtensionsCachingMemoryVersion>6.0.1</MicrosoftExtensionsCachingMemoryVersion>
     <MicrosoftIdentityModelJsonWebTokensVersion>7.5.0</MicrosoftIdentityModelJsonWebTokensVersion>
     <MicrosoftIdentityModelProtocolsOpenIdConnectVersion>7.5.0</MicrosoftIdentityModelProtocolsOpenIdConnectVersion>
+    <SystemTextJsonVersion>6.0.9</SystemTextJsonVersion>
+    <SystemNetHttpVersion>4.3.4</SystemNetHttpVersion>
+    <SystemRuntimeInteropServicesRuntimeInformationVersion>4.3.0</SystemRuntimeInteropServicesRuntimeInformationVersion>
   </PropertyGroup>
   <!-- NetCore project dependencies -->
   <PropertyGroup>

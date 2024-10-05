@@ -56,6 +56,7 @@ namespace Microsoft.Data.Sql
 
 namespace Microsoft.Data.SqlClient
 {
+#if AZURE_SUPPORT_ENABLED
     /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/ActiveDirectoryAuthenticationProvider.xml' path='docs/members[@name="ActiveDirectoryAuthenticationProvider"]/ActiveDirectoryAuthenticationProvider/*'/>
     public sealed class ActiveDirectoryAuthenticationProvider : SqlAuthenticationProvider
     {
@@ -82,6 +83,7 @@ namespace Microsoft.Data.SqlClient
         /// <include file='../../../..//doc/snippets/Microsoft.Data.SqlClient/ActiveDirectoryAuthenticationProvider.xml' path='docs/members[@name="ActiveDirectoryAuthenticationProvider"]/BeforeUnload/*'/>
         public override void BeforeUnload(SqlAuthenticationMethod authentication) { }
     }
+#endif
     /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/ApplicationIntent.xml' path='docs/members[@name="ApplicationIntent"]/ApplicationIntent/*'/>
     public enum ApplicationIntent
     {
@@ -128,6 +130,7 @@ namespace Microsoft.Data.SqlClient
         NotSpecified = 0,
         /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/SqlAuthenticationMethod.xml' path='docs/members[@name="SqlAuthenticationMethod"]/SqlPassword/*'/>
         SqlPassword = 1,
+#if AZURE_SUPPORT_ENABLED
         /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/SqlAuthenticationMethod.xml' path='docs/members[@name="SqlAuthenticationMethod"]/ActiveDirectoryPassword/*'/>
         ActiveDirectoryPassword = 2,
         /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/SqlAuthenticationMethod.xml' path='docs/members[@name="SqlAuthenticationMethod"]/ActiveDirectoryIntegrated/*'/>
@@ -146,6 +149,7 @@ namespace Microsoft.Data.SqlClient
         ActiveDirectoryDefault = 9,
         /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/SqlAuthenticationMethod.xml' path='docs/members[@name="SqlAuthenticationMethod"]/ActiveDirectoryWorkloadIdentity/*'/>
         ActiveDirectoryWorkloadIdentity = 10
+#endif
     }
     /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/SqlAuthenticationParameters.xml' path='docs/members[@name="SqlAuthenticationParameters"]/SqlAuthenticationParameters/*'/>
     public class SqlAuthenticationParameters
@@ -171,6 +175,7 @@ namespace Microsoft.Data.SqlClient
         /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/SqlAuthenticationParameters.xml' path='docs/members[@name="SqlAuthenticationParameters"]/ConnectionTimeout/*'/>
         public int ConnectionTimeout { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
     }
+#if AZURE_SUPPORT_ENABLED
     /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/SqlAuthenticationProvider.xml' path='docs/members[@name="SqlAuthenticationProvider"]/SqlAuthenticationProvider/*'/>
     public abstract partial class SqlAuthenticationProvider
     {
@@ -189,6 +194,7 @@ namespace Microsoft.Data.SqlClient
         /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/SqlAuthenticationProvider.xml' path='docs/members[@name="SqlAuthenticationProvider"]/SetProvider/*'/>
         public static bool SetProvider(Microsoft.Data.SqlClient.SqlAuthenticationMethod authenticationMethod, Microsoft.Data.SqlClient.SqlAuthenticationProvider provider) { throw null; }
     }
+#endif
     /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/SqlAuthenticationToken.xml' path='docs/members[@name="SqlAuthenticationToken"]/SqlAuthenticationToken/*'/>
     public partial class SqlAuthenticationToken
     {
@@ -912,9 +918,11 @@ namespace Microsoft.Data.SqlClient
     {
         /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/SqlConnectionAttestationProtocol.xml' path='docs/members[@name="SqlConnectionAttestationProtocol"]/NotSpecified/*' />
         NotSpecified = 0,
+#if AZURE_SUPPORT_ENABLED
 
         /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/SqlConnectionAttestationProtocol.xml' path='docs/members[@name="SqlConnectionAttestationProtocol"]/AAS/*' />
         AAS = 1,
+#endif
 
         /// <include file='../../../../doc/snippets/Microsoft.Data.SqlClient/SqlConnectionAttestationProtocol.xml' path='docs/members[@name="SqlConnectionAttestationProtocol"]/None/*' />
         None = 2,

@@ -18,6 +18,7 @@
     <Product>Core $(BaseProduct)</Product>
     <EnableTrimAnalyzer Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net6.0'))">true</EnableTrimAnalyzer>
     <NoWarn>$(NoWarn);IL2026;IL2057;IL2072;IL2075</NoWarn>
+    <DefineConstants Condition="'$(IsAzureEnabled)' == 'true'">$(DefineConstants);AZURE_SUPPORT_ENABLED</DefineConstants>
     <RootNamespace />
   </PropertyGroup>
   <!--Generating Strong Name-->
@@ -35,7 +36,21 @@
   <ItemGroup>
     <EmbeddedFiles Include="$(GeneratedAssemblyInfoFile)" />
     <EmbeddedFiles Include="$(TargetFrameworkMonikerAssemblyAttributesPath)" />
-  </ItemGroup>  
+  </ItemGroup>
+  <ItemGroup Condition="'$(IsAzureEnabled)' == 'true' And '$(OSGroup)' != 'AnyOS'" >
+    <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\ActiveDirectoryAuthenticationProvider.cs">
+      <Link>Microsoft\Data\SqlClient\ActiveDirectoryAuthenticationProvider.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\SqlAuthenticationProvider.cs">
+      <Link>Microsoft\Data\SqlClient\SqlAuthenticationProvider.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\SqlAuthenticationProviderManager.cs">
+      <Link>Microsoft\Data\SqlClient\SqlAuthenticationProviderManager.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\AzureAttestationBasedEnclaveProvider.cs">
+      <Link>Microsoft\Data\SqlClient\AzureAttestationBasedEnclaveProvider.cs</Link>
+    </Compile>
+  </ItemGroup>
   <!-- Contains common items shared between NetFx and NetCore -->
   <ItemGroup Condition="'$(OSGroup)' != 'AnyOS'">
     <Compile Include="$(CommonPath)\CoreLib\System\Threading\Tasks\TaskToApm.cs">
@@ -156,26 +171,20 @@
     <Compile Include="$(CommonSourceRoot)Microsoft\Data\Sql\SqlNotificationRequest.cs">
       <Link>Microsoft\Data\Sql\SqlNotificationRequest.cs</Link>
     </Compile>
-    <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\ActiveDirectoryAuthenticationProvider.cs">
-      <Link>Microsoft\Data\SqlClient\ActiveDirectoryAuthenticationProvider.cs</Link>
-    </Compile>
-    <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\ActiveDirectoryAuthenticationTimeoutRetryHelper.cs">
-      <Link>Microsoft\Data\SqlClient\ActiveDirectoryAuthenticationTimeoutRetryHelper.cs</Link>
-    </Compile>
     <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\AlwaysEncryptedEnclaveProviderUtils.cs">
       <Link>Microsoft\Data\SqlClient\AlwaysEncryptedEnclaveProviderUtils.cs</Link>
     </Compile>
     <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\AlwaysEncryptedKeyConverter.cs">
       <Link>Microsoft\Data\SqlClient\AlwaysEncryptedKeyConverter.cs</Link>
-    </Compile>    
+    </Compile>
     <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\ApplicationIntent.cs">
       <Link>Microsoft\Data\SqlClient\ApplicationIntent.cs</Link>
     </Compile>
     <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\AssemblyRef.cs">
       <Link>Microsoft\Data\SqlClient\AssemblyRef.cs</Link>
     </Compile>
-    <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\AzureAttestationBasedEnclaveProvider.cs">
-      <Link>Microsoft\Data\SqlClient\AzureAttestationBasedEnclaveProvider.cs</Link>
+    <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\ActiveDirectoryAuthenticationTimeoutRetryHelper.cs">
+      <Link>Microsoft\Data\SqlClient\ActiveDirectoryAuthenticationTimeoutRetryHelper.cs</Link>
     </Compile>
     <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\ColumnEncryptionKeyInfo.cs">
       <Link>Microsoft\Data\SqlClient\ColumnEncryptionKeyInfo.cs</Link>
@@ -344,12 +353,6 @@
     </Compile>
     <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\SqlAuthenticationParameters.cs">
       <Link>Microsoft\Data\SqlClient\SqlAuthenticationParameters.cs</Link>
-    </Compile>
-    <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\SqlAuthenticationProvider.cs">
-      <Link>Microsoft\Data\SqlClient\SqlAuthenticationProvider.cs</Link>
-    </Compile>
-    <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\SqlAuthenticationProviderManager.cs">
-      <Link>Microsoft\Data\SqlClient\SqlAuthenticationProviderManager.cs</Link>
     </Compile>
     <Compile Include="$(CommonSourceRoot)Microsoft\Data\SqlClient\SqlAuthenticationToken.cs">
       <Link>Microsoft\Data\SqlClient\SqlAuthenticationToken.cs</Link>
@@ -963,16 +966,23 @@
   <ItemGroup Condition="'$(TargetGroup)' == 'netcoreapp'">
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="$(SystemConfigurationConfigurationManagerVersion)" />
   </ItemGroup>
+  
+  <ItemGroup Condition="'$(IsAzureEnabled)' == 'true'">
+    <PackageReference Include="Azure.Identity" Version="$(AzureIdentityVersion)" />
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="$(MicrosoftIdentityModelProtocolsOpenIdConnectVersion)" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="$(MicrosoftIdentityModelJsonWebTokensVersion)" />
+  </ItemGroup>
+  
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient.SNI.runtime" Version="$(MicrosoftDataSqlClientSNIRuntimeVersion)" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="$(MicrosoftExtensionsCachingMemoryVersion)" />
     <!-- Enable the project reference for debugging purposes. -->
     <!-- <ProjectReference Include="$(SqlServerSourceCode)\Microsoft.SqlServer.Server.csproj" /> -->
     <PackageReference Include="Microsoft.SqlServer.Server" Version="$(MicrosoftSqlServerServerVersion)" />
-    <PackageReference Include="Azure.Identity" Version="$(AzureIdentityVersion)" />
-    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="$(MicrosoftIdentityModelProtocolsOpenIdConnectVersion)" />
-    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="$(MicrosoftIdentityModelJsonWebTokensVersion)" />
+    <PackageReference Include="System.Text.Json" Version="$(SystemTextJsonVersion)" />
+    <PackageReference Include="System.Net.Http" Version="$(SystemNetHttpVersion)" />
   </ItemGroup>
+  
   <Import Project="$(ToolsDir)targets\GenerateThisAssemblyCs.targets" />
   <Import Project="$(ToolsDir)targets\ResolveContract.targets" Condition="'$(OSGroup)' == 'AnyOS'" />
   <Import Project="$(ToolsDir)targets\NotSupported.targets" Condition="'$(OSGroup)' == 'AnyOS'" />

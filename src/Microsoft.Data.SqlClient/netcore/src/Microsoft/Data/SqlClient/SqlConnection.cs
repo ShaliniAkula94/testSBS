@@ -179,6 +179,7 @@ namespace Microsoft.Data.SqlClient
                 {
                     throw ADP.InvalidMixedArgumentOfSecureCredentialAndIntegratedSecurity();
                 }
+#if AZURE_SUPPORT_ENABLED
                 else if (UsesActiveDirectoryIntegrated(connectionOptions))
                 {
                     throw SQL.SettingCredentialWithIntegratedArgument();
@@ -207,7 +208,7 @@ namespace Microsoft.Data.SqlClient
                 {
                     throw SQL.SettingCredentialWithNonInteractiveArgument(DbConnectionStringBuilderUtil.ActiveDirectoryWorkloadIdentityString);
                 }
-
+#endif
                 Credential = credential;
             }
             // else
@@ -506,6 +507,7 @@ namespace Microsoft.Data.SqlClient
             set => _AsyncCommandInProgress = value;
         }
 
+#if AZURE_SUPPORT_ENABLED
         private bool UsesActiveDirectoryIntegrated(SqlConnectionString opt)
         {
             return opt != null && opt.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated;
@@ -540,6 +542,7 @@ namespace Microsoft.Data.SqlClient
         {
             return opt != null && opt.Authentication == SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity;
         }
+#endif
 
         private bool UsesAuthentication(SqlConnectionString opt)
         {
@@ -602,6 +605,7 @@ namespace Microsoft.Data.SqlClient
                     SqlConnectionString connectionOptions = new SqlConnectionString(value);
                     if (_credential != null)
                     {
+#if AZURE_SUPPORT_ENABLED
                         // Check for Credential being used with Authentication=ActiveDirectoryIntegrated | ActiveDirectoryInteractive |
                         //  ActiveDirectoryDeviceCodeFlow | ActiveDirectoryManagedIdentity/ActiveDirectoryMSI | ActiveDirectoryDefault. Since a different error string is used
                         // for this case in ConnectionString setter vs in Credential setter, check for this error case before calling
@@ -634,7 +638,7 @@ namespace Microsoft.Data.SqlClient
                         {
                             throw SQL.SettingNonInteractiveWithCredential(DbConnectionStringBuilderUtil.ActiveDirectoryWorkloadIdentityString);
                         }
-
+#endif
                         CheckAndThrowOnInvalidCombinationOfConnectionStringAndSqlCredential(connectionOptions);
                     }
 
@@ -986,6 +990,7 @@ namespace Microsoft.Data.SqlClient
                 if (value != null)
                 {
                     var connectionOptions = (SqlConnectionString)ConnectionOptions;
+#if AZURE_SUPPORT_ENABLED
                     // Check for Credential being used with Authentication=ActiveDirectoryIntegrated | ActiveDirectoryInteractive |
                     // ActiveDirectoryDeviceCodeFlow | ActiveDirectoryManagedIdentity/ActiveDirectoryMSI | ActiveDirectoryDefault. Since a different error string is used
                     // for this case in ConnectionString setter vs in Credential setter, check for this error case before calling
@@ -1018,7 +1023,7 @@ namespace Microsoft.Data.SqlClient
                     {
                         throw SQL.SettingCredentialWithNonInteractiveInvalid(DbConnectionStringBuilderUtil.ActiveDirectoryWorkloadIdentityString);
                     }
-
+#endif
                     CheckAndThrowOnInvalidCombinationOfConnectionStringAndSqlCredential(connectionOptions);
 
                     if (_accessToken != null)
@@ -1945,9 +1950,12 @@ namespace Microsoft.Data.SqlClient
             _applyTransientFaultHandling = (!overrides.HasFlag(SqlConnectionOverrides.OpenWithoutRetry) && connectionOptions != null && connectionOptions.ConnectRetryCount > 0);
 
             if (connectionOptions != null &&
-                (connectionOptions.Authentication == SqlAuthenticationMethod.SqlPassword ||
-                    connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryPassword ||
-                    connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryServicePrincipal) &&
+                (connectionOptions.Authentication == SqlAuthenticationMethod.SqlPassword
+#if AZURE_SUPPORT_ENABLED
+                    || connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryPassword 
+                    || connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryServicePrincipal
+#endif
+                    ) &&
                 (!connectionOptions._hasUserIdKeyword || !connectionOptions._hasPasswordKeyword) &&
                 _credential == null)
             {
@@ -2272,10 +2280,12 @@ namespace Microsoft.Data.SqlClient
                     throw ADP.InvalidMixedArgumentOfSecureAndClearCredential();
                 }
 
+#if AZURE_SUPPORT_ENABLED
                 if (connectionOptions.IntegratedSecurity || connectionOptions.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated)
                 {
                     throw SQL.ChangePasswordConflictsWithSSPI();
                 }
+#endif
 
                 if (!string.IsNullOrEmpty(connectionOptions.AttachDBFilename))
                 {

@@ -419,12 +419,14 @@ namespace Microsoft.Data.SqlClient
             _sniSpnBuffer = null;
             _authenticationProvider = null;
 
+#if AZURE_SUPPORT_ENABLED
             // AD Integrated behaves like Windows integrated when connecting to a non-fedAuth server
             if (integratedSecurity || authType == SqlAuthenticationMethod.ActiveDirectoryIntegrated)
             {
                 _authenticationProvider = _physicalStateObj.CreateSSPIContextProvider();
                 SqlClientEventSource.Log.TryTraceEvent("TdsParser.Connect | SEC | SSPI or Active Directory Authentication Library loaded for SQL Server based integrated authentication");
             }
+#endif
 
             // if Strict encryption (i.e. isTlsFirst) is chosen trust server certificate should always be false.
             if (isTlsFirst)
@@ -463,7 +465,11 @@ namespace Microsoft.Data.SqlClient
                 FQDNforDNSCache,
                 ref _connHandler.pendingSQLDNSObject,
                 serverInfo.ServerSPN,
-                integratedSecurity || authType == SqlAuthenticationMethod.ActiveDirectoryIntegrated,
+                integratedSecurity
+#if AZURE_SUPPORT_ENABLED
+                || authType == SqlAuthenticationMethod.ActiveDirectoryIntegrated
+#endif
+                ,
                 isTlsFirst,
                 hostNameInCertificate,
                 serverCertificateFilename);
@@ -3420,15 +3426,19 @@ namespace Microsoft.Data.SqlClient
             switch (enclaveType.ToUpper())
             {
                 case TdsEnums.ENCLAVE_TYPE_VBS:
-                    if (attestationProtocol != SqlConnectionAttestationProtocol.AAS
-                        && attestationProtocol != SqlConnectionAttestationProtocol.HGS
-                        && attestationProtocol != SqlConnectionAttestationProtocol.None)
+                    if (
+#if AZURE_SUPPORT_ENABLED
+                        attestationProtocol != SqlConnectionAttestationProtocol.AAS &&
+#endif
+                        attestationProtocol != SqlConnectionAttestationProtocol.HGS &&
+                        attestationProtocol != SqlConnectionAttestationProtocol.None)
                     {
                         return false;
                     }
                     break;
 
                 case TdsEnums.ENCLAVE_TYPE_SGX:
+#if AZURE_SUPPORT_ENABLED
 #if ENCLAVE_SIMULATOR
                     if (attestationProtocol != SqlConnectionAttestationProtocol.AAS
                         && attestationProtocol != SqlConnectionAttestationProtocol.None)
@@ -3438,6 +3448,7 @@ namespace Microsoft.Data.SqlClient
                     {
                         return false;
                     }
+#endif
                     break;
 
 #if ENCLAVE_SIMULATOR
@@ -8326,6 +8337,7 @@ namespace Microsoft.Data.SqlClient
                         byte workflow = 0x00;
                         switch (fedAuthFeatureData.authentication)
                         {
+#if AZURE_SUPPORT_ENABLED
                             case SqlAuthenticationMethod.ActiveDirectoryPassword:
                                 workflow = TdsEnums.MSALWORKFLOW_ACTIVEDIRECTORYPASSWORD;
                                 break;
@@ -8351,6 +8363,7 @@ namespace Microsoft.Data.SqlClient
                             case SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity:
                                 workflow = TdsEnums.MSALWORKFLOW_ACTIVEDIRECTORYWORKLOADIDENTITY;
                                 break;
+#endif
                             default:
                                 if (_connHandler._accessTokenCallback != null)
                                 {

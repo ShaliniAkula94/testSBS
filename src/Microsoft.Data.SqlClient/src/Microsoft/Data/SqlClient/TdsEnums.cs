@@ -1083,10 +1083,10 @@ namespace Microsoft.Data.SqlClient
     {
         /// <include file='../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlConnectionAttestationProtocol.xml' path='docs/members[@name="SqlConnectionAttestationProtocol"]/NotSpecified/*' />
         NotSpecified = 0,
-
+#if AZURE_SUPPORT_ENABLED
         /// <include file='../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlConnectionAttestationProtocol.xml' path='docs/members[@name="SqlConnectionAttestationProtocol"]/AAS/*' />
         AAS = 1,
-
+#endif
         /// <include file='../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlConnectionAttestationProtocol.xml' path='docs/members[@name="SqlConnectionAttestationProtocol"]/None/*' />
         None = 2,
 
@@ -1152,6 +1152,7 @@ namespace Microsoft.Data.SqlClient
 
         /// <include file='../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlAuthenticationMethod.xml' path='docs/members[@name="SqlAuthenticationMethod"]/SqlPassword/*'/>
         SqlPassword,
+#if AZURE_SUPPORT_ENABLED
 
         /// <include file='../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlAuthenticationMethod.xml' path='docs/members[@name="SqlAuthenticationMethod"]/ActiveDirectoryPassword/*'/>
         ActiveDirectoryPassword,
@@ -1179,7 +1180,7 @@ namespace Microsoft.Data.SqlClient
 
         /// <include file='../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlAuthenticationMethod.xml' path='docs/members[@name="SqlAuthenticationMethod"]/ActiveDirectoryWorkloadIdentity/*'/>
         ActiveDirectoryWorkloadIdentity,
-
+#endif
 #if ADONET_CERT_AUTH && NETFRAMEWORK
         SqlCertificate,
 #endif

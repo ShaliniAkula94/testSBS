@@ -406,6 +406,7 @@ namespace Microsoft.Data.Common
                 result = SqlAuthenticationMethod.SqlPassword;
                 isSuccess = true;
             }
+#if AZURE_SUPPORT_ENABLED
             else if (StringComparer.InvariantCultureIgnoreCase.Equals(value, ActiveDirectoryPasswordString)
                 || StringComparer.InvariantCultureIgnoreCase.Equals(value, Convert.ToString(SqlAuthenticationMethod.ActiveDirectoryPassword, CultureInfo.InvariantCulture)))
             {
@@ -454,6 +455,13 @@ namespace Microsoft.Data.Common
                 result = SqlAuthenticationMethod.ActiveDirectoryDefault;
                 isSuccess = true;
             }
+            else if (StringComparer.InvariantCultureIgnoreCase.Equals(value, ActiveDirectoryWorkloadIdentityString)
+                || StringComparer.InvariantCultureIgnoreCase.Equals(value, Convert.ToString(SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity, CultureInfo.InvariantCulture)))
+            {
+                result = SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity;
+                isSuccess = true;
+            }
+#endif
 #if ADONET_CERT_AUTH && NETFRAMEWORK
             else if (StringComparer.InvariantCultureIgnoreCase.Equals(value, SqlCertificateString)
                 || StringComparer.InvariantCultureIgnoreCase.Equals(value, Convert.ToString(SqlAuthenticationMethod.SqlCertificate, CultureInfo.InvariantCulture))) {
@@ -461,12 +469,6 @@ namespace Microsoft.Data.Common
                 isSuccess = true;
             }
 #endif
-            else if (StringComparer.InvariantCultureIgnoreCase.Equals(value, ActiveDirectoryWorkloadIdentityString)
-                || StringComparer.InvariantCultureIgnoreCase.Equals(value, Convert.ToString(SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity, CultureInfo.InvariantCulture)))
-            {
-                result = SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity;
-                isSuccess = true;
-            }
             else
             {
                 result = DbConnectionStringDefaults.Authentication;
@@ -538,6 +540,7 @@ namespace Microsoft.Data.Common
             Debug.Assert(Enum.GetNames(typeof(SqlAuthenticationMethod)).Length == 11, "SqlAuthenticationMethod enum has changed, update needed");
 #endif
             return value == SqlAuthenticationMethod.SqlPassword
+#if AZURE_SUPPORT_ENABLED
                 || value == SqlAuthenticationMethod.ActiveDirectoryPassword
                 || value == SqlAuthenticationMethod.ActiveDirectoryIntegrated
                 || value == SqlAuthenticationMethod.ActiveDirectoryInteractive
@@ -546,10 +549,11 @@ namespace Microsoft.Data.Common
                 || value == SqlAuthenticationMethod.ActiveDirectoryManagedIdentity
                 || value == SqlAuthenticationMethod.ActiveDirectoryMSI
                 || value == SqlAuthenticationMethod.ActiveDirectoryDefault
+                || value == SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity
+#endif
 #if ADONET_CERT_AUTH && NETFRAMEWORK
                 || value == SqlAuthenticationMethod.SqlCertificate
 #endif
-                || value == SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity
                 || value == SqlAuthenticationMethod.NotSpecified;
         }
 
@@ -560,6 +564,7 @@ namespace Microsoft.Data.Common
             return value switch
             {
                 SqlAuthenticationMethod.SqlPassword => SqlPasswordString,
+#if AZURE_SUPPORT_ENABLED
                 SqlAuthenticationMethod.ActiveDirectoryPassword => ActiveDirectoryPasswordString,
                 SqlAuthenticationMethod.ActiveDirectoryIntegrated => ActiveDirectoryIntegratedString,
                 SqlAuthenticationMethod.ActiveDirectoryInteractive => ActiveDirectoryInteractiveString,
@@ -568,10 +573,11 @@ namespace Microsoft.Data.Common
                 SqlAuthenticationMethod.ActiveDirectoryManagedIdentity => ActiveDirectoryManagedIdentityString,
                 SqlAuthenticationMethod.ActiveDirectoryMSI => ActiveDirectoryMSIString,
                 SqlAuthenticationMethod.ActiveDirectoryDefault => ActiveDirectoryDefaultString,
+                SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity => ActiveDirectoryWorkloadIdentityString,
+#endif
 #if ADONET_CERT_AUTH && NETFRAMEWORK
                 SqlAuthenticationMethod.SqlCertificate => SqlCertificateString,
 #endif
-                SqlAuthenticationMethod.ActiveDirectoryWorkloadIdentity => ActiveDirectoryWorkloadIdentityString,
                 _ => null
             };
         }
@@ -732,11 +738,13 @@ namespace Microsoft.Data.Common
                 result = SqlConnectionAttestationProtocol.HGS;
                 return true;
             }
+#if AZURE_SUPPORT_ENABLED
             else if (StringComparer.InvariantCultureIgnoreCase.Equals(value, nameof(SqlConnectionAttestationProtocol.AAS)))
             {
                 result = SqlConnectionAttestationProtocol.AAS;
                 return true;
             }
+#endif
             else if (StringComparer.InvariantCultureIgnoreCase.Equals(value, nameof(SqlConnectionAttestationProtocol.None)))
             {
                 result = SqlConnectionAttestationProtocol.None;
@@ -754,7 +762,9 @@ namespace Microsoft.Data.Common
             Debug.Assert(Enum.GetNames(typeof(SqlConnectionAttestationProtocol)).Length == 4, "SqlConnectionAttestationProtocol enum has changed, update needed");
             return value == SqlConnectionAttestationProtocol.NotSpecified
                 || value == SqlConnectionAttestationProtocol.HGS
+#if AZURE_SUPPORT_ENABLED
                 || value == SqlConnectionAttestationProtocol.AAS
+#endif
                 || value == SqlConnectionAttestationProtocol.None;
         }
 
@@ -764,7 +774,9 @@ namespace Microsoft.Data.Common
 
             return value switch
             {
+#if AZURE_SUPPORT_ENABLED
                 SqlConnectionAttestationProtocol.AAS => nameof(SqlConnectionAttestationProtocol.AAS),
+#endif
                 SqlConnectionAttestationProtocol.HGS => nameof(SqlConnectionAttestationProtocol.HGS),
                 SqlConnectionAttestationProtocol.None => nameof(SqlConnectionAttestationProtocol.None),
                 _ => null
@@ -854,7 +866,7 @@ namespace Microsoft.Data.Common
             throw ADP.InvalidConnectionOptionValue(keyword);
         }
 
-        #endregion
+#endregion
 
         #region <<IPAddressPreference Utility>>
         /// <summary>

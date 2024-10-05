@@ -173,6 +173,7 @@ namespace Microsoft.Data.SqlClient
                     connectionTimeout = int.MaxValue;
                 }
 
+#if AZURE_SUPPORT_ENABLED
                 if (opt.Authentication == SqlAuthenticationMethod.ActiveDirectoryInteractive || opt.Authentication == SqlAuthenticationMethod.ActiveDirectoryDeviceCodeFlow)
                 {
                     // interactive/device code flow mode will always have pool's CreateTimeout = 10 x ConnectTimeout.
@@ -186,6 +187,7 @@ namespace Microsoft.Data.SqlClient
                     }
                     SqlClientEventSource.Log.TryTraceEvent("SqlConnectionFactory.CreateConnectionPoolGroupOptions | Set connection pool CreateTimeout '{0}' when Authentication mode '{1}' is used.", connectionTimeout, opt.Authentication);
                 }
+#endif
                 poolingOptions = new DbConnectionPoolGroupOptions(
                                                 opt.IntegratedSecurity,
                                                 opt.MinPoolSize,

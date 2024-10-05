@@ -72,7 +72,11 @@ namespace Microsoft.Data.SqlClient
 
                 // Pass DbConnectionPoolIdentity to SqlInternalConnectionTds if using integrated security.
                 // Used by notifications.
-                if (opt.IntegratedSecurity || opt.UsesCertificate || opt.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated)
+                if (opt.IntegratedSecurity || opt.UsesCertificate
+#if AZURE_SUPPORT_ENABLED
+                    || opt.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated
+#endif
+                    )
                 {
                     if (pool != null)
                     {
@@ -180,6 +184,7 @@ namespace Microsoft.Data.SqlClient
                 else if (connectionTimeout >= Int32.MaxValue / 1000)
                     connectionTimeout = Int32.MaxValue;
 
+#if AZURE_SUPPORT_ENABLED
                 if (opt.Authentication == SqlAuthenticationMethod.ActiveDirectoryInteractive)
                 {
                     // interactive mode will always have pool's CreateTimeout = 10 x ConnectTimeout.
@@ -193,9 +198,13 @@ namespace Microsoft.Data.SqlClient
                     }
                     SqlClientEventSource.Log.TryTraceEvent("<sc.SqlConnectionFactory.CreateConnectionPoolGroupOptions>Set connection pool CreateTimeout={0} when AD Interactive is in use.", connectionTimeout);
                 }
-
+#endif
                 poolingOptions = new DbConnectionPoolGroupOptions(
-                                                    opt.IntegratedSecurity || opt.UsesCertificate || opt.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated,
+                                                    opt.IntegratedSecurity || opt.UsesCertificate
+#if AZURE_SUPPORT_ENABLED
+                                                    || opt.Authentication == SqlAuthenticationMethod.ActiveDirectoryIntegrated
+#endif
+                                                    ,
                                                     opt.MinPoolSize,
                                                     opt.MaxPoolSize,
                                                     connectionTimeout,
