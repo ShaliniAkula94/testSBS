@@ -5,7 +5,9 @@
 using System;
 using System.ComponentModel;
 using System.Data.Common;
+using System.Data.SqlClient;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using Microsoft.Data.Common;
 
 namespace Microsoft.Data.SqlClient
@@ -426,89 +428,84 @@ namespace Microsoft.Data.SqlClient
             }
         }
         //---netfx
-
-        //netcore---
-        /// <include file='../../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlTransaction.xml' path='docs/members[@name="SqlTransaction"]/Save/*' />
+        
+        /// <include file='../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlTransaction.xml' path='docs/members[@name="SqlTransaction"]/Save/*' />
         public override void Save(string savePointName)
         {
-            ZombieCheck();
-
-            SqlStatistics statistics = null;
-            using (TryEventScope.Create("SqlTransaction.Save | API | Object Id {0} | Save Point Name '{1}'", ObjectID, savePointName))
-            {
-                try
-                {
-                    statistics = SqlStatistics.StartTimer(Statistics);
-
-                    _internalTransaction.Save(savePointName);
-                }
-                finally
-                {
-                    SqlStatistics.StopTimer(statistics);
-                }
-            }
-        }
-        //---netcore
-        //netfx---
-        /// <include file='../../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlTransaction.xml' path='docs/members[@name="SqlTransaction"]/Save/*' />
-        public void Save(string savePointName)
-        {
+            #if NETFRAMEWORK
             SqlConnection.ExecutePermission.Demand(); // MDAC 81476
-
+            const string eventScopeMessage = "<sc.SqlTransaction.Save|API> {0} savePointName='{1}'";
+            #else
+            const string eventScopeMessage = "SqlTransaction.Save | API | Object Id {0} | Save Point Name '{1}'"
+            #endif
+            
             ZombieCheck();
 
             SqlStatistics statistics = null;
-            using (TryEventScope.Create("<sc.SqlTransaction.Save|API> {0} savePointName='{1}'", ObjectID, savePointName))
+            using (TryEventScope.Create(eventScopeMessage, ObjectID, savePointName))
             {
-
+                #if NETFRAMEWORK
                 TdsParser bestEffortCleanupTarget = null;
                 RuntimeHelpers.PrepareConstrainedRegions();
+                #endif
+                
                 try
                 {
-#if DEBUG
-                    TdsParser.ReliabilitySection tdsReliabilitySection = new();
-
-                    RuntimeHelpers.PrepareConstrainedRegions();
-                    try
+                    void SaveInternal()
                     {
-                        tdsReliabilitySection.Start();
-#else
-                    {
-#endif //DEBUG
-                        bestEffortCleanupTarget = SqlInternalConnection.GetBestEffortCleanupTarget(_connection);
                         statistics = SqlStatistics.StartTimer(Statistics);
-
                         _internalTransaction.Save(savePointName);
                     }
-#if DEBUG
-                    finally
-                    {
-                        tdsReliabilitySection.Stop();
-                    }
-#endif //DEBUG
+
+                    #if NETFRAMEWORK && DEBUG
+                    bestEffortCleanupTarget = SqlInternalConnection.GetBestEffortCleanupTarget(_connection);
+                    ExecuteInReliabilitySection(SaveInternal);
+                    #else
+                    SaveInternal();
+                    #endif
                 }
-                catch (System.OutOfMemoryException e)
+                #if NETFRAMEWORK
+                catch (OutOfMemoryException e)
                 {
                     _connection.Abort(e);
                     throw;
                 }
-                catch (System.StackOverflowException e)
+                catch (StackOverflowException e)
                 {
                     _connection.Abort(e);
                     throw;
                 }
-                catch (System.Threading.ThreadAbortException e)
+                catch (ThreadAbortException e)
                 {
                     _connection.Abort(e);
                     SqlInternalConnection.BestEffortCleanup(bestEffortCleanupTarget);
                     throw;
                 }
+                #endif
                 finally
                 {
                     SqlStatistics.StopTimer(statistics);
                 }
             }
         }
-        //---netfx
+
+        #if NETFRAMEWORK && DEBUG
+        private static void ExecuteInReliabilitySection(Action action)
+        {
+            TdsParser.ReliabilitySection tdsReliabilitySection = new();
+            
+            RuntimeHelpers.PrepareConstrainedRegions();
+            try
+            {
+                tdsReliabilitySection.Start();
+
+                action();
+            }
+            finally
+            {
+                tdsReliabilitySection.Stop();
+            }
+        }
+        #endif
     }
 }
