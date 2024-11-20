@@ -331,103 +331,81 @@ namespace Microsoft.Data.SqlClient
         }
         //---netfx
 
-        //netcore---
-        /// <include file='../../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlTransaction.xml' path='docs/members[@name="SqlTransaction"]/RollbackTransactionName/*' />
+        /// <include file='../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlTransaction.xml' path='docs/members[@name="SqlTransaction"]/RollbackTransactionName/*' />
         public override void Rollback(string transactionName)
         {
+            #if NETFRAMEWORK
+            SqlConnection.ExecutePermission.Demand(); // MDAC 81476
+            const string eventScopeMessage = "SqlTransaction.Rollback | API | Object Id {0}, Transaction Name='{1}', ActivityID {2}, Client Connection Id {3}";
+            #else
+            const string eventScopeMessage = <sc.SqlTransaction.Rollback|API> {0} transactionName='{1}', activityId='{2}', clientConnectionId='{3}'";
+            #endif
+            
+            #if NET
             using (DiagnosticTransactionScope diagnosticScope = s_diagnosticListener.CreateTransactionRollbackScope(_isolationLevel, _connection, InternalTransaction, transactionName))
             {
-                ZombieCheck();
+            #endif
 
-                using (TryEventScope.Create(SqlClientEventSource.Log.TryScopeEnterEvent("SqlTransaction.Rollback | API | Object Id {0}, Transaction Name='{1}', ActivityID {2}, Client Connection Id {3}", ObjectID, transactionName, ActivityCorrelator.Current, Connection?.ClientConnectionId)))
+                ZombieCheck();
+                SqlStatistics statistics = null;
+
+                using (TryEventScope.Create(SqlClientEventSource.Log.TryScopeEnterEvent(eventScopeMessage, ObjectID, transactionName, ActivityCorrelator.Current, Connection?.ClientConnectionId)))
                 {
-                    SqlStatistics statistics = null;
+                    #if NETFRAMEWORK
+                    TdsParser bestEffortCleanupTarget = null;
+                    RuntimeHelpers.PrepareConstrainedRegions();
+                    #endif
+
                     try
                     {
-                        statistics = SqlStatistics.StartTimer(Statistics);
+                        void RollbackInternal()
+                        {
+                            statistics = SqlStatistics.StartTimer(Statistics);
+                            _isFromAPI = true;
 
-                        _isFromAPI = true;
+                            _internalTransaction.Rollback(transactionName);
+                        }
 
-                        _internalTransaction.Rollback(transactionName);
+                        #if NETFRAMEWORK && DEBUG
+                        ExecuteInReliabilitySection(RollbackInternal);
+                        #else
+                        RollbackInternal();
+                        #endif
                     }
+                    #if NETFRAMEWORK
+                    catch (OutOfMemoryException e)
+                    {
+                        _connection.Abort(e);
+                        throw;
+                    }
+                    catch (StackOverflowException e)
+                    {
+                        _connection.Abort(e);
+                        throw;
+                    }
+                    catch (ThreadAbortException e)
+                    {
+                        _connection.Abort(e);
+                        SqlInternalConnection.BestEffortCleanup(bestEffortCleanupTarget);
+                        throw;
+                    }
+                    #else
                     catch (Exception ex)
                     {
                         diagnosticScope.SetException(ex);
                         throw;
                     }
+                    #endif
                     finally
                     {
-                        SqlStatistics.StopTimer(statistics);
                         _isFromAPI = false;
+                        SqlStatistics.StopTimer(statistics);
                     }
                 }
-            }
+            #if NET
+            } // Close diagnostic scope using block
+            #endif
         }
-        //---netcore
-        //netfx---
-        /// <include file='../../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlTransaction.xml' path='docs/members[@name="SqlTransaction"]/RollbackTransactionName/*' />
-        public void Rollback(string transactionName)
-        {
-            SqlConnection.ExecutePermission.Demand(); // MDAC 81476
-
-            ZombieCheck();
-
-            SqlStatistics statistics = null;
-            using (TryEventScope.Create("<sc.SqlTransaction.Rollback|API> {0} transactionName='{1}'", ObjectID, transactionName))
-            {
-                TdsParser bestEffortCleanupTarget = null;
-                RuntimeHelpers.PrepareConstrainedRegions();
-                try
-                {
-#if DEBUG
-                    TdsParser.ReliabilitySection tdsReliabilitySection = new();
-
-                    RuntimeHelpers.PrepareConstrainedRegions();
-                    try
-                    {
-                        tdsReliabilitySection.Start();
-#else
-                    {
-#endif //DEBUG
-                        bestEffortCleanupTarget = SqlInternalConnection.GetBestEffortCleanupTarget(_connection);
-                        statistics = SqlStatistics.StartTimer(Statistics);
-
-                        _isFromAPI = true;
-
-                        _internalTransaction.Rollback(transactionName);
-                    }
-#if DEBUG
-                    finally
-                    {
-                        tdsReliabilitySection.Stop();
-                    }
-#endif //DEBUG
-                }
-                catch (System.OutOfMemoryException e)
-                {
-                    _connection.Abort(e);
-                    throw;
-                }
-                catch (System.StackOverflowException e)
-                {
-                    _connection.Abort(e);
-                    throw;
-                }
-                catch (System.Threading.ThreadAbortException e)
-                {
-                    _connection.Abort(e);
-                    SqlInternalConnection.BestEffortCleanup(bestEffortCleanupTarget);
-                    throw;
-                }
-                finally
-                {
-                    _isFromAPI = false;
-
-                    SqlStatistics.StopTimer(statistics);
-                }
-            }
-        }
-        //---netfx
         
         /// <include file='../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlTransaction.xml' path='docs/members[@name="SqlTransaction"]/Save/*' />
         public override void Save(string savePointName)
@@ -440,8 +418,8 @@ namespace Microsoft.Data.SqlClient
             #endif
             
             ZombieCheck();
-
             SqlStatistics statistics = null;
+            
             using (TryEventScope.Create(eventScopeMessage, ObjectID, savePointName))
             {
                 #if NETFRAMEWORK
