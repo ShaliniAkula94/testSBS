@@ -1,14 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="Current" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Import the root-level properties. -->
+  <Import Project="../build.props" />
+
   <PropertyGroup>
+    <!--
+      Force a C# language version of 9.0 regardless of what framework we're
+      targeting.
+
+      TODO(ADO.Net-33639): This is unsupported and should be removed.
+    -->
     <LangVersion>9.0</LangVersion>
-    <TargetsWindows Condition="'$(OS)' == 'Windows_NT' AND '$(OSGroup)' == ''">true</TargetsWindows>
-    <TargetsWindows Condition="'$(OS)' != 'Windows_NT' AND '$(OSGroup)' == ''">false</TargetsWindows>
-    <TargetsWindows Condition="'$(OSGroup)' == 'Windows_NT'">true</TargetsWindows>
-    <TargetsUnix Condition="'$(OS)' == 'Unix' AND '$(OSGroup)' == ''">true</TargetsUnix>
-    <TargetsUnix Condition="'$(OS)' != 'Unix' AND '$(OSGroup)' == ''">false</TargetsUnix>
-    <TargetsUnix Condition="'$(OSGroup)' == 'Unix'">true</TargetsUnix>
-    <TargetsAnyOS Condition="'$(OSGroup)' == 'AnyOS'">true</TargetsAnyOS>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <IsSourceProject Condition="$([System.Text.RegularExpressions.Regex]::IsMatch($(MSBuildProjectDirectory), 'src%24'))">true</IsSourceProject>
     <!--
       "ReferenceType" property supports below options:
@@ -35,7 +41,6 @@
   </PropertyGroup>
   <PropertyGroup>
     <ProjectDir>$(MSBuildThisFileDirectory)</ProjectDir>
-    <RepoRoot>$(ProjectDir)..\</RepoRoot>
     <Artifacts>$(RepoRoot)artifacts\$(ReferenceType)\</Artifacts>
     <ToolsArtifactsDir Condition="'$(ToolsArtifactsDir)'==''">$(Artifacts)tools\</ToolsArtifactsDir>
     <ManagedSourceCode>$(ProjectDir)Microsoft.Data.SqlClient\</ManagedSourceCode>
@@ -54,15 +59,26 @@
     <CommonPath>$(NetCoreSource)src\Common\src</CommonPath>
     <CommonTestPath>$(NetCoreSource)src\Common\tests</CommonTestPath>
     <TestsPath>$(ProjectDir)Microsoft.Data.SqlClient\tests\</TestsPath>
-    <BinFolder Condition="'$(TargetsWindows)' == 'true'">$(Artifacts)bin\Windows_NT\</BinFolder>
-    <BinFolder Condition="'$(TargetsAnyOS)' == 'true'">$(Artifacts)bin\AnyOS\</BinFolder>
-    <BinFolder Condition="'$(TargetsUnix)' == 'true'">$(Artifacts)bin\Unix\</BinFolder>
-    <ToolsDir Condition="'$(ToolsDir)'==''">$(RepoRoot)tools\</ToolsDir>
-    <GenAPISrcDir Condition="'$(GenAPISrcDir)'==''">$(ToolsDir)GenAPI\</GenAPISrcDir>
+    
+    <!--
+      We seem to be conflating the OS the build is running on with the OSes
+      supported by the target framework runtime.  It's not clear why we're
+      specifying the absolute path to the bin folder rather than just the base
+      and letting the tooling decide what per-target/platform/CPU folders to
+      create.
+
+      For the time being, we will keep the existing folder structure, but
+      instead of using the OS to decide the folder, we will use the target
+      framework.  Additionally, the strange OSGroup 'AnyOS' value is used as
+      an override.
+    -->
+    <BinFolder Condition="$(TargetsNetFx)">$(Artifacts)bin\Windows_NT\</BinFolder>
+    <BinFolder Condition="! $(TargetsNetFx)">$(Artifacts)bin\Unix\</BinFolder>
+    <BinFolder Condition="'$(OSGroup)' == 'AnyOS'">$(Artifacts)bin\AnyOS\</BinFolder>
+    
     <PackagesDir Condition="'$(PackagesDir)'==''">$(RepoRoot)packages\</PackagesDir>
     <NuGetRoot Condition="'$(NuGetRoot)' == ''">$(RepoRoot).nuget\</NuGetRoot>
     <NuGetCmd>$(NuGetRoot)nuget.exe</NuGetCmd>
-    <!-- Respect environment variable for the .NET install directory if set; otherwise, use the current default location -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904;NU1905</WarningsNotAsErrors>
     <BuildSimulator Condition="'$(BuildSimulator)' != 'true'">false</BuildSimulator>
@@ -89,18 +105,26 @@
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>  
 
-  <!-- Provides Version properties -->
-  <Import Project="$(ToolsDir)props\Versions.props" />
-  <Import Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net9.0'))" Project="$(ToolsDir)props\VersionsNet9OrLater.props" />
-  <!-- Provides Tool properties -->
-  <Import Project="$(ToolsDir)props\Tools.props" />
-  <!-- Provides Build properties -->
-  <Import Project="$(ToolsDir)props\AssemblyInfo.props" /> 
-  <Import Project="$(ToolsDir)props\AssemblyRef.props" />
-  <Import Project="$(ToolsDir)targets\RepositoryInfo.targets" />
-
   <!-- Fix GetTargetPath issues - see https://github.com/dotnet/msbuild/issues/4303#issuecomment-482345617 -->
   <PropertyGroup>
     <AddSyntheticProjectReferencesForSolutionDependencies>false</AddSyntheticProjectReferencesForSolutionDependencies>
   </PropertyGroup>
+
+  <!--
+    Build runtimes other than .NET Framework require the .NET Framework
+    reference assemblies.
+    
+    MSBuildRuntimeType 'Full' means the build is running via .NET Framework
+    tooling, and the reference assemblies are already available.
+
+    Any other value means we need to explicitly add the reference assemblies.
+  -->
+  <ItemGroup Condition="$(MSBuildRuntimeType) != 'Full'">
+    <PackageReference
+      Include="Microsoft.NETFramework.ReferenceAssemblies"
+      Version="$(MicrosoftNETFrameworkReferenceAssembliesVersion)">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 </Project>

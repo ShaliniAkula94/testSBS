@@ -23,8 +23,6 @@ Once the environment is setup properly, execute the desired set of commands belo
 |`BuildNetCoreAllOS`|Builds the .NET driver for all target frameworks and operating systems.|
 |`BuildNetFx`|Builds the .NET Framework driver for all target frameworks.|
 |`BuildTests`|Builds tests for the .NET and .NET Framework drivers.|
-|`BuildTestsNetCore`|Builds tests for the .NET driver.|
-|`BuildTestsNetFx`|Builds tests for the .NET Framework driver.|
 |`Clean`|Cleans generated files.|
 |`Restore`|Restores Nuget packages.|
 |`RunTests`|Runs the functional and manual tests for the .NET Framework and .NET drivers|
@@ -41,11 +39,11 @@ Once the environment is setup properly, execute the desired set of commands belo
 |`Platform`|`AnyCPU`, `x86`, `x64`, `ARM`, `ARM64`|`AnyCPU`|May only be set when using package reference type or running tests.|
 |`TestSet`|`1`, `2`, `3`, `AE`|all|Build or run a subset of the manual tests. Omit (default) to target all tests.|
 |`DotnetPath`|Absolute file path to an installed `dotnet` version.|The system default specified by the path variable|Set to run tests using a specific dotnet version (e.g. C:\net6-win-x86\)|
-|`TF`|`net8.0`, `net462`, `net47`, `net471`, `net472`, `net48`, `net481`|`net8.0` in netcore, `net462` in netfx|Sets the target framework when building or running tests. Not applicable when building the drivers.|
+|`TestRuntime`|`net8.0`, `net9.0`, `net462`, `net47`, `net471`, `net472`, `net48`, `net481`|`net9.0`|Sets the target runtime when running tests.|
 |`ResultsDirectory`|An absolute file path|./TestResults relative to current directory|Specifies where to write test results.|
 
 
-## Example Workflows using MSBuild (Recommended)
+## Example Workflows using MSBuild
 Using the default configuration and running all tests:
 
 ```bash
@@ -54,12 +52,28 @@ msbuild -t:BuildTests
 msbuild -t:RunTests
 ```
 
-Targeting .NET Framework (or any specific supported version):
+Targeting a specific framework:
 
 ```bash
-msbuild -p:TF=net462
-msbuild -t:BuildTests -p:TF=net462
-msbuild -t:RunTests -p:TF=net462
+msbuild -p:TargetFramework=net462
+msbuild -t:BuildTests -p:TargetFramework=net462
+msbuild -t:RunTests -p:TestRuntime=net462
+
+msbuild -p:TargetFramework=net8.0
+msbuild -t:BuildTests -p:TargetFramework=net8.0
+msbuild -t:RunTests -p:TestRuntime=net8.0
+```
+
+Running tests on a framework newer than the build target:
+
+```bash
+msbuild -p:TargetFramework=net462
+msbuild -t:BuildTests -p:TargetFramework=net462
+msbuild -t:RunTests -p:TestRuntime=net481
+
+msbuild -p:TargetFramework=net8.0
+msbuild -t:BuildTests -p:TargetFramework=net8.0
+msbuild -t:RunTests -p:TestRuntime=net9.0
 ```
 
 Using the Release configuration:
@@ -78,7 +92,7 @@ msbuild -t:BuildTests
 msbuild -t:RunFunctionalTests
 ```
 
-Using a specific dotnet version/architecture:
+Using a specific dotnet CLI toolchain:
 
 ```bash
 msbuild -p:configuration=Release
@@ -131,13 +145,13 @@ Manual Tests require the below setup to run:
 
 ```bash
 msbuild 
-dotnet test "src\Microsoft.Data.SqlClient\tests\FunctionalTests\Microsoft.Data.SqlClient.Tests.csproj" -p:Platform="x86" -p:Configuration="Release" -p:TestTargetOS="Windowsnetfx" --no-build -v n --filter "category!=nonnetfxtests&category!=failing&category!=nonwindowstests"
+dotnet test "src\Microsoft.Data.SqlClient\tests\FunctionalTests\Microsoft.Data.SqlClient.Tests.csproj" -p:Platform="x86" -p:Configuration="Release" -f net462 --no-build -v n --filter "category!=nonnetfxtests&category!=failing&category!=nonwindowstests"
 ```
 
 - Windows (`netfx x64`):
 
 ```bash
-dotnet test "src\Microsoft.Data.SqlClient\tests\FunctionalTests\Microsoft.Data.SqlClient.Tests.csproj" -p:Platform="x64" -p:Configuration="Release" -p:TestTargetOS="Windowsnetfx" --no-build -v n --filter "category!=nonnetfxtests&category!=failing&category!=nonwindowstests"
+dotnet test "src\Microsoft.Data.SqlClient\tests\FunctionalTests\Microsoft.Data.SqlClient.Tests.csproj" -p:Platform="x64" -p:Configuration="Release" -f net462 --no-build -v n --filter "category!=nonnetfxtests&category!=failing&category!=nonwindowstests"
 ```
 
 - AnyCPU:
@@ -147,50 +161,61 @@ dotnet test "src\Microsoft.Data.SqlClient\tests\FunctionalTests\Microsoft.Data.S
   Windows (`netcoreapp`):
   
 ```bash
-dotnet test "src\Microsoft.Data.SqlClient\tests\FunctionalTests\Microsoft.Data.SqlClient.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" -p:TestTargetOS="Windowsnetcoreapp" --no-build -v n --filter "category!=nonnetcoreapptests&category!=failing&category!=nonwindowstests"
+dotnet test "src\Microsoft.Data.SqlClient\tests\FunctionalTests\Microsoft.Data.SqlClient.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" -f net8.0 --no-build -v n --filter "category!=nonnetcoreapptests&category!=failing&category!=nonwindowstests"
 ```
 
   Unix (`netcoreapp`):
 
 ```bash
-dotnet test "src/Microsoft.Data.SqlClient/tests/FunctionalTests/Microsoft.Data.SqlClient.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" -p:TestTargetOS="Unixnetcoreapp" --no-build -v n --filter "category!=nonnetcoreapptests&category!=failing&category!=nonlinuxtests&category!=nonuaptests"
+dotnet test "src/Microsoft.Data.SqlClient/tests/FunctionalTests/Microsoft.Data.SqlClient.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" -f net8.0 --no-build -v n --filter "category!=nonnetcoreapptests&category!=failing&category!=nonlinuxtests&category!=nonuaptests"
 ```
+
 #### Run Manual Tests
 
 - Windows (`netfx x86`):
 
 ```bash
-dotnet test "src\Microsoft.Data.SqlClient\tests\ManualTests\Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="x86" -p:Configuration="Release" -p:TestTargetOS="Windowsnetfx" --no-build -v n --filter "category!=nonnetfxtests&category!=failing&category!=nonwindowstests"
+dotnet test "src\Microsoft.Data.SqlClient\tests\ManualTests\Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="x86" -p:Configuration="Release" -f net462 --no-build -v n --filter "category!=nonnetfxtests&category!=failing&category!=nonwindowstests"
   ```
 
 - Windows (`netfx x64`):
 
 ```bash
-dotnet test "src\Microsoft.Data.SqlClient\tests\ManualTests\Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="x64" -p:Configuration="Release" -p:TestTargetOS="Windowsnetfx" --no-build -v n --filter "category!=nonnetfxtests&category!=failing&category!=nonwindowstests"
+dotnet test "src\Microsoft.Data.SqlClient\tests\ManualTests\Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="x64" -p:Configuration="Release" -f net462 --no-build -v n --filter "category!=nonnetfxtests&category!=failing&category!=nonwindowstests"
 ```
 
 - Windows (`netfx`):
 
 ```bash
-dotnet test "src\Microsoft.Data.SqlClient\tests\ManualTests\Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" -p:TestTargetOS="Windowsnetfx" --no-build -v n --filter "category!=nonnetfxtests&category!=failing&category!=nonwindowstests"
+dotnet test "src\Microsoft.Data.SqlClient\tests\ManualTests\Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" -f net462 --no-build -v n --filter "category!=nonnetfxtests&category!=failing&category!=nonwindowstests"
 ```
 
 - Windows (`netcoreapp`):
 
 ```bash
-dotnet test "src\Microsoft.Data.SqlClient\tests\ManualTests\Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" -p:TestTargetOS="Windowsnetcoreapp" --no-build -v n --filter "category!=nonnetcoreapptests&category!=failing&category!=nonwindowstests"
+dotnet test "src\Microsoft.Data.SqlClient\tests\ManualTests\Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" -f net8.0 --no-build -v n --filter "category!=nonnetcoreapptests&category!=failing&category!=nonwindowstests"
 ```
 
 - Unix (`netcoreapp`):
 
 ```bash
-dotnet test "src/Microsoft.Data.SqlClient/tests/ManualTests/Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" -p:TestTargetOS="Unixnetcoreapp" --no-build -v n --filter "category!=nonnetcoreapptests&category!=failing&category!=nonlinuxtests&category!=nonuaptests"
+dotnet test "src/Microsoft.Data.SqlClient/tests/ManualTests/Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" -f net8.0 --no-build -v n --filter "category!=nonnetcoreapptests&category!=failing&category!=nonlinuxtests&category!=nonuaptests"
 ```
 
 ## Run A Single Test
 
+### For all targeted frameworks on the installed runtimes
+
 ```bash
-dotnet test "src\Microsoft.Data.SqlClient\tests\ManualTests\Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" -p:TestTargetOS="Windowsnetcoreapp" --no-build -v n --filter "FullyQualifiedName=Microsoft.Data.SqlClient.ManualTesting.Tests.AlwaysEncrypted.CspProviderExt.TestKeysFromCertificatesCreatedWithMultipleCryptoProviders"
+dotnet test "src\Microsoft.Data.SqlClient\tests\ManualTests\Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" --no-build -v n --filter "FullyQualifiedName=Microsoft.Data.SqlClient.ManualTesting.Tests.AlwaysEncrypted.CspProviderExt.TestKeysFromCertificatesCreatedWithMultipleCryptoProviders"
+```
+
+### For a specific target framework on a specific runtime
+
+```bash
+dotnet test "src\Microsoft.Data.SqlClient\tests\ManualTests\Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" -f net462 -p:TestRuntime=net481 --no-build -v n --filter "FullyQualifiedName=Microsoft.Data.SqlClient.ManualTesting.Tests.AlwaysEncrypted.CspProviderExt.TestKeysFromCertificatesCreatedWithMultipleCryptoProviders"
+
+dotnet test "src\Microsoft.Data.SqlClient\tests\ManualTests\Microsoft.Data.SqlClient.ManualTesting.Tests.csproj" -p:Platform="AnyCPU" -p:Configuration="Release" -f net8.0 -p:TestRuntime=net9.0 --no-build -v n --filter "FullyQualifiedName=Microsoft.Data.SqlClient.ManualTesting.Tests.AlwaysEncrypted.CspProviderExt.TestKeysFromCertificatesCreatedWithMultipleCryptoProviders"
 ```
 
 ## Testing with Custom ReferenceType
@@ -211,22 +236,15 @@ A non-AnyCPU platform reference can only be used with package reference type. Ot
 
 ### Building Tests with Reference Type
 
-For .NET, all 4 reference types are supported:
-
 ```bash
-msbuild -t:BuildTestsNetCore -p:ReferenceType=Project
-# Default setting uses Project Reference.
+# Default setting uses Project reference.
+msbuild -t:BuildTests
 
-msbuild -t:BuildTestsNetCore -p:ReferenceType=Package
-```
+# Explicitly specify Project reference.
+msbuild -t:BuildTests -p:ReferenceType=Project
 
-For .NET Framework, below reference types are supported:
-
-```bash
-msbuild -t:BuildTestsNetFx -p:ReferenceType=Project
-# Default setting uses Project Reference.
-
-msbuild -t:BuildTestsNetFx -p:ReferenceType=Package
+# Explicitly specify Package reference.
+msbuild -t:BuildTests -p:ReferenceType=Package
 ```
 
 ### Running Tests with Reference Type
@@ -244,23 +262,21 @@ Tests can be built and run with custom Target Frameworks. See the below examples
 ### Building Tests with custom target framework
 
 ```bash
-msbuild -t:BuildTestsNetFx -p:TargetNetFxVersion=net462
 # Build the tests for custom .NET Framework target
-```
+msbuild -t:BuildTests -p:TargetFramework=net462
 
-```bash
-msbuild -t:BuildTestsNetCore -p:TargetNetCoreVersion=net8.0
 # Build the tests for custom .NET target
+msbuild -t:BuildTests -p:TargetFramework=net8.0
 ```
 
-### Running Tests with custom target framework (traditional)
+### Running Tests with custom target framework
 
 ```bash
-dotnet test -p:TargetNetFxVersion=net462 ...
-# Use above property to run Functional Tests with custom .NET Framework target
+# Use the .NET Framework 4.6.2 runtime to run the tests.
+dotnet test --no-build -p:TestRuntime=net462 ...
 
-dotnet test -p:TargetNetCoreVersion=net8.0 ...
-# Use above property to run Functional Tests with custom .NET target
+# Use the .NET 8.0 runtime to run the tests.
+dotnet test --no-build -p:TestRuntime=net8.0 ...
 ```
 
 
@@ -313,14 +329,6 @@ To run the same:
 There may be times where connection cannot be made to SQL Server, we found below ideas helpful:
 
 - Clear Docker images to create clean image from time-to-time, and clear docker cache if needed by running `docker system prune` in Command Prompt.
-
-- If you face `Microsoft.Data.SqlClient.SNI.dll not found` errors when debugging, try updating the below properties in the netcore\Microsoft.Data.SqlClient.csproj file and try again:
-
-  ```xml
-    <OSGroup>Unix</OSGroup>
-    <TargetsWindows>false</TargetsWindows>
-    <TargetsUnix>true</TargetsUnix>
-  ```
 
 ## Collecting Code Coverage
 

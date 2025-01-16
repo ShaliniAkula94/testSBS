@@ -52,15 +52,15 @@ steps:
 
 - ${{ if eq(parameters.product, 'AKV') }}:
   - task: MSBuild@1
-    displayName: 'BuildAKVNetFx using build.proj'
+    displayName: 'BuildAKV using build.proj'
     inputs:
       solution: '**/build.proj'
       configuration: '${{parameters.Configuration }}'
-      msbuildArguments: '-p:AssemblyFileVersion=${{parameters.AssemblyFileVersion }} -t:BuildAKVNetFx -p:NugetPackageVersion=${{parameters.packageRefMdsVersion }} -p:ReferenceType=Package -p:SigningKeyPath=$(Agent.TempDirectory)\netfxKeypair.snk'
+      msbuildArguments: '-p:AssemblyFileVersion=${{parameters.AssemblyFileVersion }} -t:BuildAKV -p:NugetPackageVersion=${{parameters.packageRefMdsVersion }} -p:ReferenceType=Package -p:SigningKeyPath=$(Agent.TempDirectory)\netfxKeypair.snk'
 
   - task: MSBuild@1
-    displayName: 'BuildAKVNetCoreAllOS using build.proj'
+    displayName: 'BuildAKVAllOS using build.proj'
     inputs:
       solution: '**/build.proj'
       configuration: '${{parameters.Configuration }}'
-      msbuildArguments: '-p:AssemblyFileVersion=${{parameters.AssemblyFileVersion }} -t:BuildAKVNetCoreAllOS -p:NugetPackageVersion=${{parameters.packageRefMdsVersion }} -p:ReferenceType=Package -p:SigningKeyPath=$(Agent.TempDirectory)\netfxKeypair.snk'
+      msbuildArguments: '-p:AssemblyFileVersion=${{parameters.AssemblyFileVersion }} -t:BuildAKVAllOS -p:NugetPackageVersion=${{parameters.packageRefMdsVersion }} -p:ReferenceType=Package -p:SigningKeyPath=$(Agent.TempDirectory)\netfxKeypair.snk'

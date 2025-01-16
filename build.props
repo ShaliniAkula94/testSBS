@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  This file defines properties that aren't specific to a particular project.
+  They can safely be imported into any project file.
+-->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup>
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+    <ToolsDir Condition="'$(ToolsDir)'==''">$(RepoRoot)tools\</ToolsDir>
+    <GenAPISrcDir Condition="'$(GenAPISrcDir)'==''">$(ToolsDir)GenAPI\</GenAPISrcDir>
+  </PropertyGroup>
+
+  <Import Project="$(ToolsDir)props\Versions.props" />
+  <Import
+    Project="$(ToolsDir)props\VersionsNet9OrLater.props"
+    Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net9.0'))" />
+  <Import Project="$(ToolsDir)props\Tools.props" />
+  <Import Project="$(ToolsDir)props\AssemblyInfo.props" /> 
+  <Import Project="$(ToolsDir)props\AssemblyRef.props" />
+  <Import Project="$(ToolsDir)targets\RepositoryInfo.targets" />
+
+  <!--
+    Convenience boolean indicating whether or not we're targeting .NET
+    Framework.  Defaults to false.
+
+    We're careful to ensure this always results in an MSBuild boolean value.
+  -->
+  <!-- Normalize any provided value.  Any value other than 'true' is false. -->
+  <PropertyGroup Condition="'$(TargetsNetFx)' != ''">  
+    <TargetsNetFx Condition="'$(TargetsNetFx)' != 'true'">false</TargetsNetFx>
+  </PropertyGroup>
+  <!-- No provided value, so choose a default value based on TargetFramework. -->
+  <PropertyGroup Condition="'$(TargetsNetFx)' == ''">
+    <TargetsNetFx>false</TargetsNetFx>
+    <TargetsNetFx Condition="'$([MSBuild]::GetTargetFrameworkIdentifier($(TargetFramework)))' == '.NETFramework'">true</TargetsNetFx>
+  </PropertyGroup>
+
+  <Target Name="Paul">
+    <Message Importance="high" Text="Paul target is running; TargetsNetFx=$(TargetsNetFx)" />
+  </Target>
+
+</Project>
