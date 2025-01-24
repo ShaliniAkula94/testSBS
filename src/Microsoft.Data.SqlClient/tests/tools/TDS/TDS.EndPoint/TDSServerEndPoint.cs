@@ -248,7 +248,8 @@ namespace Microsoft.SqlServer.TDS.EndPoint
         {
             if (EventLog != null)
             {
-                EventLog.WriteLine(text, args);
+                EventLog.WriteLine(
+                    DateTime.Now.ToString("HH:mm:ss.fff") + ' ' + text, args);
             }
         }
     }

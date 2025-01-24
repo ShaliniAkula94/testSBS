@@ -43,11 +43,19 @@
       <summary>
         Specifies that TLS encryption is optional when connecting to the server. If the server requires encryption, encryption will be negotiated.
       </summary>
+      <remarks>
+        This corresponds to the TDS PRELOGIN message ENCRYPTION value of
+        ENCRYPT_OFF.
+      </remarks>
     </Optional>
     <Mandatory>
       <summary>
         Specifies that TLS encryption is required when connecting to the server. If the server doesn't support encryption, the connection will fail.
       </summary>
+      <remarks>
+        This corresponds to the TDS PRELOGIN message ENCRYPTION value of
+        ENCRYPT_ON.
+      </remarks>
     </Mandatory>
     <Strict>
       <summary>

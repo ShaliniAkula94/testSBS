@@ -17,40 +17,19 @@ using Xunit;
 
 namespace Microsoft.Data.SqlClient.ManualTesting.Tests
 {
-    public class CertificateTestWithTdsServer : IDisposable
+    public sealed class CertificateTestWithTdsServer : IDisposable
     {
         private static readonly string s_fullPathToPowershellScript = Path.Combine(Directory.GetCurrentDirectory(), "makepfxcert.ps1");
         private static readonly string s_fullPathToCleanupPowershellScript = Path.Combine(Directory.GetCurrentDirectory(), "removecert.ps1");
         private static readonly string s_fullPathToPfx = Path.Combine(Directory.GetCurrentDirectory(), "localhostcert.pfx");
         private static readonly string s_fullPathTothumbprint = Path.Combine(Directory.GetCurrentDirectory(), "thumbprint.txt");
         private static readonly string s_fullPathToClientCert = Path.Combine(Directory.GetCurrentDirectory(), "clientcert");
-        private static bool s_windowsAdmin = true;
-        private static string s_instanceName = "MSSQLSERVER";
-        // s_instanceNamePrefix will get replaced with MSSQL$ is there is an instance name in the connection string
-        private static string s_instanceNamePrefix = "";
         private const string LocalHost = "localhost";
 
         public CertificateTestWithTdsServer()
         {
             SqlConnectionStringBuilder builder = new(DataTestUtility.TCPConnectionString);
             Assert.True(DataTestUtility.ParseDataSource(builder.DataSource, out string hostname, out _, out string instanceName));
-
-            if (!string.IsNullOrEmpty(instanceName))
-            {
-                s_instanceName = instanceName;
-                s_instanceNamePrefix = "MSSQL$";
-            }
-
-            // Confirm that user has elevated access on Windows
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                using WindowsIdentity identity = WindowsIdentity.GetCurrent();
-                WindowsPrincipal principal = new(identity);
-                if (principal.IsInRole(WindowsBuiltInRole.Administrator))
-                    s_windowsAdmin = true;
-                else
-                    s_windowsAdmin = false;
-            }
 
             if (!Directory.Exists(s_fullPathToClientCert))
             {
@@ -71,71 +50,58 @@ namespace Microsoft.Data.SqlClient.ManualTesting.Tests
         private static bool IsNotAzureServer() => DataTestUtility.IsNotAzureServer();
         private static bool UseManagedSNIOnWindows() => DataTestUtility.UseManagedSNIOnWindows;
 
-        private static string ForceEncryptionRegistryPath
+        [ConditionalTheory(
+            nameof(AreConnStringsSetup),
+            nameof(IsNotAzureServer),
+            nameof(IsLocalHost))]
+        [MemberData(
+            nameof(ConnectionTestParametersData.GetConnectionTestParameters),
+            MemberType = typeof(ConnectionTestParametersData))]
+        public void ConnectionTest(ConnectionTestParameters connectionTestParameters)
         {
-            get
+            // Some of the certificate operations require elevated privileges on
+            // Windows.
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                if (DataTestUtility.IsSQL2022())
+                using WindowsIdentity identity = WindowsIdentity.GetCurrent();
+                WindowsPrincipal principal = new(identity);
+                if (! principal.IsInRole(WindowsBuiltInRole.Administrator))
                 {
-                    return $@"SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL16.{s_instanceName}\MSSQLSERVER\SuperSocketNetLib";
+                    Assert.Fail(
+                        "This test requires Administrator role; current user " +
+                        $"{identity.User} lacks this role");
                 }
-                if (DataTestUtility.IsSQL2019())
-                {
-                    return $@"SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL15.{s_instanceName}\MSSQLSERVER\SuperSocketNetLib";
-                }
-                if (DataTestUtility.IsSQL2016())
-                {
-                    return $@"SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL14.{s_instanceName}\MSSQLSERVER\SuperSocketNetLib";
-                }
-                return string.Empty;
-            }
-        }
-
-        [ConditionalTheory(nameof(AreConnStringsSetup), nameof(IsNotAzureServer), nameof(IsLocalHost))]
-        [MemberData(nameof(ConnectionTestParametersData.GetConnectionTestParameters), MemberType = typeof(ConnectionTestParametersData))]
-        [PlatformSpecific(TestPlatforms.Windows)]
-        public void BeginWindowsConnectionTest(ConnectionTestParameters connectionTestParameters)
-        {
-            if (!s_windowsAdmin)
-            {
-                Assert.Fail("User needs to have elevated access for these set of tests");
             }
 
-            ConnectionTest(connectionTestParameters);
-        }
-
-        [ConditionalTheory(nameof(AreConnStringsSetup), nameof(IsNotAzureServer), nameof(IsLocalHost))]
-        [MemberData(nameof(ConnectionTestParametersData.GetConnectionTestParameters), MemberType = typeof(ConnectionTestParametersData))]
-        [PlatformSpecific(TestPlatforms.Linux)]
-        public void BeginLinuxConnectionTest(ConnectionTestParameters connectionTestParameters)
-        {
-            ConnectionTest(connectionTestParameters);
-        }
-
-        private void ConnectionTest(ConnectionTestParameters connectionTestParameters)
-        {
             SqlConnectionStringBuilder builder = new(DataTestUtility.TCPConnectionString);
 
             // The TestTdsServer does not validate the user name and password, so we can use any value if they are not defined.
             string userId = string.IsNullOrWhiteSpace(builder.UserID) ? "user" : builder.UserID;
             string password = string.IsNullOrWhiteSpace(builder.Password) ? "password" : builder.Password;
 
-            using TestTdsServer server = TestTdsServer.StartTestServer(enableFedAuth: false, enableLog: false, connectionTimeout: 15,
-                methodName: "",
-#if NET9_0
-                X509CertificateLoader.LoadPkcs12FromFile(s_fullPathToPfx, "nopassword", X509KeyStorageFlags.UserKeySet),
+            using TestTdsServer server =
+                TestTdsServer.StartTestServer(
+                    encryptionCertificate:
+#if NET
+                        X509CertificateLoader.LoadPkcs12FromFile(
+                            s_fullPathToPfx,
+                            "nopassword",
+                            X509KeyStorageFlags.UserKeySet),
 #else
-                new X509Certificate2(s_fullPathToPfx, "nopassword", X509KeyStorageFlags.UserKeySet),
+                        new X509Certificate2(
+                            s_fullPathToPfx,
+                            "nopassword",
+                            X509KeyStorageFlags.UserKeySet),
 #endif
-                encryptionProtocols: connectionTestParameters.EncryptionProtocols,
-                encryptionType: connectionTestParameters.TdsEncryptionType);
+                    encryptionProtocols: connectionTestParameters.EncryptionProtocols,
+                    encryptionType: connectionTestParameters.TdsEncryptionType);
 
             builder = new(server.ConnectionString)
             {
                 UserID = userId,
                 Password = password,
                 TrustServerCertificate = connectionTestParameters.TrustServerCertificate,
-                Encrypt = connectionTestParameters.Encrypt,
+                Encrypt = connectionTestParameters.Encrypt
             };
 
             if (!string.IsNullOrEmpty(connectionTestParameters.Certificate))
@@ -152,11 +118,40 @@ namespace Microsoft.Data.SqlClient.ManualTesting.Tests
             try
             {
                 connection.Open();
-                Assert.Equal(connectionTestParameters.TestResult, (connection.State == ConnectionState.Open));
             }
-            catch (Exception)
+            catch (SqlException ex)
             {
-                Assert.False(connectionTestParameters.TestResult);
+                // When Open() throws, we expect a single error code of 20,
+                // which means encryption negotiation failed.
+                //
+                // However, on Windows we seem to get code 10054
+                // (SNI_WSAECONNRESET) instead.
+                //
+                Assert.Single(ex.Errors);
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    Assert.Equal(10054, ex.Errors[0].Number);
+                }
+                else
+                {
+                    Assert.Equal(20, ex.Errors[0].Number);
+                }
+            }
+            catch (Exception ex)
+            {
+                Assert.Fail($"Failed to open connection: {ex}");
+            }
+
+            // Are we expecting the connection to be open?
+            if (connectionTestParameters.TestResult)
+            {
+                // Yes, so verify that it's open.
+                Assert.Equal(ConnectionState.Open, connection.State);
+            }
+            else
+            {
+                // No, so verify that it isn't open.
+                Assert.NotEqual(ConnectionState.Open, connection.State);
             }
         }
 
@@ -238,32 +233,13 @@ namespace Microsoft.Data.SqlClient.ManualTesting.Tests
             Directory.Delete(s_fullPathToClientCert, true);
         }
 
-        private static void RemoveForceEncryptionFromRegistryPath(string registryPath)
-        {
-            RegistryKey key = Registry.LocalMachine.OpenSubKey(registryPath, true);
-            key?.SetValue("ForceEncryption", 0, RegistryValueKind.DWord);
-            key?.SetValue("Certificate", "", RegistryValueKind.String);
-            ServiceController sc = new($"{s_instanceNamePrefix}{s_instanceName}");
-            sc.Stop();
-            sc.WaitForStatus(ServiceControllerStatus.Stopped);
-            sc.Start();
-            sc.WaitForStatus(ServiceControllerStatus.Running);
-        }
-
         public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                if (disposing && !string.IsNullOrEmpty(s_fullPathTothumbprint))
+                if (!string.IsNullOrEmpty(s_fullPathTothumbprint))
                 {
                     RemoveCertificate();
-                    RemoveForceEncryptionFromRegistryPath(ForceEncryptionRegistryPath);
                 }
             }
             else

@@ -43,5 +43,16 @@ namespace Microsoft.Data.SqlClient.ManualTesting.Tests.DataCommon
             _encryptionType = tdsEncryptionType;
             EncryptionProtocols = sslProtocols;
         }
+
+        public override string ToString()
+        {
+            return
+                $"tdsEncryptionType={_encryptionType} " +
+                $"encryptOption={_encryptionOption} " +
+                $"trustServerCert={_trustServerCert} " +
+                $"cert={_cert} " +
+                $"hnic={_hnic} " +
+                $"result={_result}";
+        }
     }
 }
