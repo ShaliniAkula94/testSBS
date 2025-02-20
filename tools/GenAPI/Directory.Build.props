@@ -2,8 +2,11 @@
 <Project ToolsVersion="Current" DefaultTargets="Build" 
   xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
-  <!-- Import the closest parent Directory.build.props, wherever it happens to be. -->
-  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <!--
+    Import the "root" Directory.build.props, which lives in src/ rather than
+    the repo root.
+  -->
+  <Import Project="../../src/Directory.Build.props" />
 
   <!-- Audit Settings -->
   <PropertyGroup>

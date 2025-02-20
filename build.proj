@@ -14,19 +14,6 @@
     <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
     <!-- Flag to control whether or not to build Microsoft.DotNet.GenAPI project in tools -->
     <BuildTools Condition="'$(BuildTools)' == ''">true</BuildTools>
-
-    <!--
-      When building and running tests, we target net462, net8.0, and net9.0,
-      unless overridden via $(TF).
-
-      Note that it doesn't make any sense to BuildTestsNetFx with $TF set to
-      net9.0, or BuildTestsNetCore with $TF set to net462.  However, nothing
-      prevents that here.
-    -->
-    <TargetNetFxVersion Condition="'$(TargetNetFxVersion)' == '' AND '$(TF)' != ''">$(TF)</TargetNetFxVersion>
-    <TargetNetFxVersion Condition="'$(TargetNetFxVersion)' == ''">net462</TargetNetFxVersion>
-    <TargetNetCoreVersion Condition="'$(TargetNetCoreVersion)' == '' AND '$(TF)' != ''">$(TF)</TargetNetCoreVersion>
-    <TargetNetCoreVersion Condition="'$(TargetNetCoreVersion)' == ''">net8.0;net9.0</TargetNetCoreVersion>
     
     <!--
       Flag that controls whether or not we generate Nuget packages.
@@ -37,7 +24,7 @@
     <GenerateNuget Condition="'$(GenerateNuget)' == '' AND $(OS.StartsWith('Win'))">true</GenerateNuget>
 
     <SqlServerLibProperties>Configuration=$(Configuration);AssemblyVersion=$(SqlServerAssemblyVersion);AssemblyFileVersion=$(SqlServerAssemblyFileVersion);Version=$(SqlServerPackageVersion);</SqlServerLibProperties>
-    <ProjectProperties>BuildProj=true;Configuration=$(Configuration);AssemblyFileVersion=$(AssemblyFileVersion);TargetsWindows=$(TargetsWindows);TargetsUnix=$(TargetsUnix);TargetNetFxVersion=$(TargetNetFxVersion);TargetNetCoreVersion=$(TargetNetCoreVersion);</ProjectProperties>
+    <ProjectProperties>BuildProj=true;Configuration=$(Configuration);AssemblyFileVersion=$(AssemblyFileVersion);TargetsWindows=$(TargetsWindows);TargetsUnix=$(TargetsUnix);TF=$(TF);</ProjectProperties>
     <TestProjectProperties>BuildProjectReferences=false;$(ProjectProperties);BuildForRelease=false</TestProjectProperties>
     <ResultsDirectory Condition="$(ResultsDirectory) == ''">TestResults</ResultsDirectory>
     <!-- 
@@ -60,7 +47,8 @@
 
   <!-- Populate all managed projects -->
   <ItemGroup>
-    <GenAPI Include="**/tools/GenAPI/Microsoft.DotNet.GenAPI/Microsoft.DotNet.GenAPI.csproj" />
+    <BuildTools Include="**/tools/GenAPI/Microsoft.DotNet.GenAPI/Microsoft.DotNet.GenAPI.csproj" />
+    
     <SqlServerLib Include="**/Microsoft.SqlServer.Server.csproj" />    
     <NetFxDriver Include="**/netfx/**/Microsoft.Data.SqlClient*.csproj" />
     <NetCoreDriver Include="**/netcore/**/Microsoft.Data.SqlClient*.csproj" />
@@ -118,7 +106,8 @@
   </Target>
 
   <Target Name="BuildTools" Condition="'$(BuildTools)' == 'true'">
-    <MSBuild Projects="@(GenAPI)" Properties="ReferenceType=$(ReferenceType)" />
+    <MSBuild Projects="@(BuildTools)" Targets="restore" Properties="ReferenceType=$(ReferenceType)" />
+    <MSBuild Projects="@(BuildTools)" Properties="ReferenceType=$(ReferenceType)" />
   </Target>
 
   <Target Name="BuildNetFx" DependsOnTargets="RestoreNetFx">
@@ -188,20 +177,20 @@
   <Target Name="RunTests" DependsOnTargets="RunFunctionalTests;RunManualTests"/>
   <Target Name="RunFunctionalTests">
     <!-- Windows - .NET Framework -->
-    <Exec ConsoleToMsBuild="true" Command="$(DotnetPath)dotnet test &quot;@(FunctionalTestsProj)&quot; -p:Configuration=$(Configuration) -p:TargetsNetFx=true -p:TargetNetFxVersion=$(TargetNetFxVersion) -p:ReferenceType=$(ReferenceType) --no-build -v n --collect &quot;Code coverage&quot; -p:TestSet=$(TestSet) --results-directory $(ResultsDirectory) --filter &quot;category!=nonnetfxtests&amp;category!=failing&amp;category!=nonwindowstests&quot; &quot;--logger:trx;LogFilePrefix=Functional-Windowsnetfx-$(TestSet)&quot;" Condition="$(OS.StartsWith('Win'))"/>
+    <Exec ConsoleToMsBuild="true" Command="$(DotnetPath)dotnet test &quot;@(FunctionalTestsProj)&quot; -p:Configuration=$(Configuration) -p:TargetsNetFx=true -p:TF=$(TF) -p:ReferenceType=$(ReferenceType) --no-build -v n --collect &quot;Code coverage&quot; -p:TestSet=$(TestSet) --results-directory $(ResultsDirectory) --filter &quot;category!=nonnetfxtests&amp;category!=failing&amp;category!=nonwindowstests&quot; &quot;--logger:trx;LogFilePrefix=Functional-Windowsnetfx-$(TestSet)&quot;" Condition="$(OS.StartsWith('Win'))"/>
     <!-- Windows - .NET -->
-    <Exec ConsoleToMsBuild="true" Command="$(DotnetPath)dotnet test &quot;@(FunctionalTestsProj)&quot; -p:Configuration=$(Configuration) -p:TargetNetCoreVersion=$(TargetNetCoreVersion) -p:ReferenceType=$(ReferenceType) --no-build -v n --collect &quot;Code coverage&quot; -p:TestSet=$(TestSet) --results-directory $(ResultsDirectory) --filter &quot;category!=nonnetcoreapptests&amp;category!=failing&amp;category!=nonwindowstests&quot; &quot;--logger:trx;LogFilePrefix=Functional-Windowsnetcoreapp-$(TestSet)&quot;" Condition="$(OS.StartsWith('Win'))"/>
+    <Exec ConsoleToMsBuild="true" Command="$(DotnetPath)dotnet test &quot;@(FunctionalTestsProj)&quot; -p:Configuration=$(Configuration) -p:TF=$(TF) -p:ReferenceType=$(ReferenceType) --no-build -v n --collect &quot;Code coverage&quot; -p:TestSet=$(TestSet) --results-directory $(ResultsDirectory) --filter &quot;category!=nonnetcoreapptests&amp;category!=failing&amp;category!=nonwindowstests&quot; &quot;--logger:trx;LogFilePrefix=Functional-Windowsnetcoreapp-$(TestSet)&quot;" Condition="$(OS.StartsWith('Win'))"/>
     <!-- Unix - .NET -->
-    <Exec ConsoleToMsBuild="true" Command="$(DotnetPath)dotnet test &quot;@(FunctionalTestsProj)&quot; -p:Configuration=$(Configuration) -p:TargetNetCoreVersion=$(TargetNetCoreVersion) -p:ReferenceType=$(ReferenceType) --no-build -v n -p:TestSet=$(TestSet) --results-directory $(ResultsDirectory) --collect &quot;Code coverage&quot; --filter &quot;category!=nonnetcoreapptests&amp;category!=failing&amp;category!=nonlinuxtests&amp;category!=nonuaptests&quot; &quot;--logger:trx;LogFilePrefix=Functional-Unixnetcoreapp-$(TestSet)&quot;" Condition="! $(OS.StartsWith('Win'))"/>
+    <Exec ConsoleToMsBuild="true" Command="$(DotnetPath)dotnet test &quot;@(FunctionalTestsProj)&quot; -p:Configuration=$(Configuration) -p:TF=$(TF) -p:ReferenceType=$(ReferenceType) --no-build -v n -p:TestSet=$(TestSet) --results-directory $(ResultsDirectory) --collect &quot;Code coverage&quot; --filter &quot;category!=nonnetcoreapptests&amp;category!=failing&amp;category!=nonlinuxtests&amp;category!=nonuaptests&quot; &quot;--logger:trx;LogFilePrefix=Functional-Unixnetcoreapp-$(TestSet)&quot;" Condition="! $(OS.StartsWith('Win'))"/>
   </Target>
 
   <Target Name="RunManualTests">
     <!-- Windows - .NET Framework -->
-    <Exec ConsoleToMsBuild="true" Command="$(DotnetPath)dotnet test &quot;@(ManualTestsProj)&quot; -p:Configuration=$(Configuration) -p:TargetsNetFx=true -p:TargetNetFxVersion=$(TargetNetFxVersion) -p:ReferenceType=$(ReferenceType) --no-build -l &quot;console;verbosity=normal&quot; --collect &quot;Code coverage&quot; -p:TestSet=$(TestSet) --results-directory $(ResultsDirectory) --filter &quot;category!=nonnetfxtests&amp;category!=failing&amp;category!=nonwindowstests&quot; &quot;--logger:trx;LogFilePrefix=Manual-Windowsnetfx-$(TestSet)&quot;" Condition="$(OS.StartsWith('Win'))"/>
+    <Exec ConsoleToMsBuild="true" Command="$(DotnetPath)dotnet test &quot;@(ManualTestsProj)&quot; -p:Configuration=$(Configuration) -p:TargetsNetFx=true -p:TF=$(TF) -p:ReferenceType=$(ReferenceType) --no-build -l &quot;console;verbosity=normal&quot; --collect &quot;Code coverage&quot; -p:TestSet=$(TestSet) --results-directory $(ResultsDirectory) --filter &quot;category!=nonnetfxtests&amp;category!=failing&amp;category!=nonwindowstests&quot; &quot;--logger:trx;LogFilePrefix=Manual-Windowsnetfx-$(TestSet)&quot;" Condition="$(OS.StartsWith('Win'))"/>
     <!-- Windows - .NET -->
-    <Exec ConsoleToMsBuild="true" Command="$(DotnetPath)dotnet test &quot;@(ManualTestsProj)&quot; -p:Configuration=$(Configuration) -p:TargetNetCoreVersion=$(TargetNetCoreVersion) -p:ReferenceType=$(ReferenceType) --no-build -l &quot;console;verbosity=normal&quot; --collect &quot;Code coverage&quot; -p:TestSet=$(TestSet) --results-directory $(ResultsDirectory) --filter &quot;category!=nonnetcoreapptests&amp;category!=failing&amp;category!=nonwindowstests&quot; &quot;--logger:trx;LogFilePrefix=Manual-Windowsnetcoreapp-$(TestSet)&quot;" Condition="$(OS.StartsWith('Win'))"/>
+    <Exec ConsoleToMsBuild="true" Command="$(DotnetPath)dotnet test &quot;@(ManualTestsProj)&quot; -p:Configuration=$(Configuration) -p:TF=$(TF) -p:ReferenceType=$(ReferenceType) --no-build -l &quot;console;verbosity=normal&quot; --collect &quot;Code coverage&quot; -p:TestSet=$(TestSet) --results-directory $(ResultsDirectory) --filter &quot;category!=nonnetcoreapptests&amp;category!=failing&amp;category!=nonwindowstests&quot; &quot;--logger:trx;LogFilePrefix=Manual-Windowsnetcoreapp-$(TestSet)&quot;" Condition="$(OS.StartsWith('Win'))"/>
     <!-- Unix - .NET -->
-    <Exec ConsoleToMsBuild="true" Command="$(DotnetPath)dotnet test &quot;@(ManualTestsProj)&quot; -p:Configuration=$(Configuration) -p:TargetNetCoreVersion=$(TargetNetCoreVersion) -p:ReferenceType=$(ReferenceType) --no-build -l &quot;console;verbosity=normal&quot; --collect &quot;Code coverage&quot; -p:TestSet=$(TestSet) --results-directory $(ResultsDirectory) --filter &quot;category!=nonnetcoreapptests&amp;category!=failing&amp;category!=nonlinuxtests&amp;category!=nonuaptests&quot; &quot;--logger:trx;LogFilePrefix=Manual-Unixnetcoreapp-$(TestSet)&quot;" Condition="! $(OS.StartsWith('Win'))"/>
+    <Exec ConsoleToMsBuild="true" Command="$(DotnetPath)dotnet test &quot;@(ManualTestsProj)&quot; -p:Configuration=$(Configuration) -p:TF=$(TF) -p:ReferenceType=$(ReferenceType) --no-build -l &quot;console;verbosity=normal&quot; --collect &quot;Code coverage&quot; -p:TestSet=$(TestSet) --results-directory $(ResultsDirectory) --filter &quot;category!=nonnetcoreapptests&amp;category!=failing&amp;category!=nonlinuxtests&amp;category!=nonuaptests&quot; &quot;--logger:trx;LogFilePrefix=Manual-Unixnetcoreapp-$(TestSet)&quot;" Condition="! $(OS.StartsWith('Win'))"/>
   </Target>
 
   <Target Name="Clean">
