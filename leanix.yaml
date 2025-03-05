@@ -1,0 +1,28 @@
+version: 1
+metadata:
+  name: CBREInterfaceTest11
+  externalId: CBREInterfaceTest11
+  description: |
+    A microservice responsible for payment disputes.
+    This service handles payment transaction disputes and is an integral part of our payment ecosystem.
+  type: Backend
+  repository:
+    url: https://example.com
+    path: /path/to/repo
+    status: active
+    visibility: private
+
+  applications:
+    - factSheetId: 28fe4aa2-6e46-41a1-a131-72afb3acf256
+
+
+
+  teams:
+    - factSheetId: 647c5a78-ea21-40cb-a8d7-3a92d14c06e1
+    - factSheetId: f9c7d079-1cac-4511-8968-15e0c63081a7
+
+  resources:
+    - name: Disputes Process Flow
+      type: documentation
+      url: https://myorg.atlassian.net/wiki/spaces/disputes
+      description: Disputes process flow and diagrams
