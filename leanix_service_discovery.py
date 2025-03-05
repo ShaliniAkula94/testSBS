@@ -28,7 +28,7 @@ MANIFEST_API = f"{LEANIX_FQDN}/technology-discovery/v1/manifests"
 
 # Manifest file and SBOM file
 LEANIX_MANIFEST_FILE = os.getenv("LEANIX_MANIFEST_FILE", "leanix.yaml")
-SBOM_FILE = "CBRE.xml"
+#SBOM_FILE = "CBRE.xml"
 
 
 def _ensure_file(file: Path):
