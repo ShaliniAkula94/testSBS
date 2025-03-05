@@ -9,26 +9,18 @@ using System.Data.Common;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
-using System.Runtime.ConstrainedExecution;
-using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
 using Microsoft.Data.Common;
-using Microsoft.Data.SqlClient;
+using Microsoft.Data.ProviderBase;
+using static Microsoft.Data.SqlClient.ConnectionPool.DbConnectionPoolState;
 
-namespace Microsoft.Data.ProviderBase
+namespace Microsoft.Data.SqlClient.ConnectionPool
 {
-    internal sealed class DbConnectionPool
+    internal sealed class WaitHandleDbConnectionPool : DbConnectionPool
     {
-        private enum State
-        {
-            Initializing,
-            Running,
-            ShuttingDown,
-        }
-
         // This class is a way to stash our cloned Tx key for later disposal when it's no longer needed.
         // We can't get at the key in the dictionary without enumerating entries, so we stash an extra
         // copy as part of the value.
@@ -362,17 +354,17 @@ namespace Microsoft.Data.ProviderBase
             }
         }
 
-        private const int MAX_Q_SIZE = (int)0x00100000;
+        private const int MAX_Q_SIZE = 0x00100000;
 
         // The order of these is important; we want the WaitAny call to be signaled
         // for a free object before a creation signal.  Only the index first signaled
         // object is returned from the WaitAny call.
-        private const int SEMAPHORE_HANDLE = (int)0x0;
-        private const int ERROR_HANDLE = (int)0x1;
-        private const int CREATION_HANDLE = (int)0x2;
-        private const int BOGUS_HANDLE = (int)0x3;
+        private const int SEMAPHORE_HANDLE = 0x0;
+        private const int ERROR_HANDLE = 0x1;
+        private const int CREATION_HANDLE = 0x2;
+        private const int BOGUS_HANDLE = 0x3;
 
-        private const int WAIT_ABANDONED = (int)0x80;
+        private const int WAIT_ABANDONED = 0x80;
 
         private const int ERROR_WAIT_DEFAULT = 5 * 1000; // 5 seconds
 
@@ -391,8 +383,6 @@ namespace Microsoft.Data.ProviderBase
         /// The private member which carries the set of authenticationcontexts for this pool (based on the user's identity).
         /// </summary>
         private readonly ConcurrentDictionary<DbConnectionPoolAuthenticationContextKey, DbConnectionPoolAuthenticationContext> _pooledDbAuthenticationContexts;
-
-        private State _state;
 
         private readonly ConcurrentStack<DbConnectionInternal> _stackOld = new ConcurrentStack<DbConnectionInternal>();
         private readonly ConcurrentStack<DbConnectionInternal> _stackNew = new ConcurrentStack<DbConnectionInternal>();
@@ -418,11 +408,8 @@ namespace Microsoft.Data.ProviderBase
         private readonly List<DbConnectionInternal> _objectList;
         private int _totalObjects;
 
-        private static int _objectTypeCount; // EventSource counter
-        internal readonly int _objectID = System.Threading.Interlocked.Increment(ref _objectTypeCount);
-
         // only created by DbConnectionPoolGroup.GetConnectionPool
-        internal DbConnectionPool(
+        internal WaitHandleDbConnectionPool(
                             DbConnectionFactory connectionFactory,
                             DbConnectionPoolGroup connectionPoolGroup,
                             DbConnectionPoolIdentity identity,
@@ -435,7 +422,7 @@ namespace Microsoft.Data.ProviderBase
                 throw ADP.InternalError(ADP.InternalErrorCode.AttemptingToPoolOnRestrictedToken);
             }
 
-            _state = State.Initializing;
+            State = Initializing;
 
             lock (s_random)
             {
@@ -462,7 +449,7 @@ namespace Microsoft.Data.ProviderBase
             _transactedConnectionPool = new TransactedConnectionPool(this);
 
             _poolCreateRequest = new WaitCallback(PoolCreateRequest); // used by CleanupCallback
-            _state = State.Running;
+            State = Running;
             SqlClientEventSource.Log.TryPoolerTraceEvent("<prov.DbConnectionPool.DbConnectionPool|RES|CPOOL> {0}, Constructed.", ObjectID);
 
             //_cleanupTimer & QueuePoolCreateRequest is delayed until DbConnectionPoolGroup calls
@@ -474,17 +461,17 @@ namespace Microsoft.Data.ProviderBase
             get { return PoolGroupOptions.CreationTimeout; }
         }
 
-        internal int Count
+        internal override int Count
         {
             get { return _totalObjects; }
         }
 
-        internal DbConnectionFactory ConnectionFactory
+        internal override DbConnectionFactory ConnectionFactory
         {
             get { return _connectionFactory; }
         }
 
-        internal bool ErrorOccurred
+        internal override bool ErrorOccurred
         {
             get { return _errorOccurred; }
         }
@@ -494,7 +481,7 @@ namespace Microsoft.Data.ProviderBase
             get { return PoolGroupOptions.HasTransactionAffinity; }
         }
 
-        internal TimeSpan LoadBalanceTimeout
+        internal override TimeSpan LoadBalanceTimeout
         {
             get { return PoolGroupOptions.LoadBalanceTimeout; }
         }
@@ -503,7 +490,7 @@ namespace Microsoft.Data.ProviderBase
         {
             get
             {
-                if (State.Running != _state) // Don't allow connection create when not running.
+                if (State != Running) // Don't allow connection create when not running.
                     return false;
 
                 int totalObjects = Count;
@@ -514,7 +501,7 @@ namespace Microsoft.Data.ProviderBase
                 if (totalObjects < MinPoolSize)
                     return true;
 
-                int freeObjects = (_stackNew.Count + _stackOld.Count);
+                int freeObjects = _stackNew.Count + _stackOld.Count;
                 int waitingRequests = _waitCount;
                 bool needToReplenish = (freeObjects < waitingRequests) || ((freeObjects == waitingRequests) && (totalObjects > 1));
 
@@ -522,14 +509,14 @@ namespace Microsoft.Data.ProviderBase
             }
         }
 
-        internal DbConnectionPoolIdentity Identity
+        internal override DbConnectionPoolIdentity Identity
         {
             get { return _identity; }
         }
 
-        internal bool IsRunning
+        internal override bool IsRunning
         {
-            get { return State.Running == _state; }
+            get { return State == Running; }
         }
 
         private int MaxPoolSize
@@ -542,32 +529,24 @@ namespace Microsoft.Data.ProviderBase
             get { return PoolGroupOptions.MinPoolSize; }
         }
 
-        internal int ObjectID
-        {
-            get
-            {
-                return _objectID;
-            }
-        }
-
 #if NETFRAMEWORK
-        internal DbConnectionPoolCounters PerformanceCounters
+        internal override DbConnectionPoolCounters PerformanceCounters
         {
             get { return _connectionFactory.PerformanceCounters; }
         }
 #endif
 
-        internal DbConnectionPoolGroup PoolGroup
+        internal override DbConnectionPoolGroup PoolGroup
         {
             get { return _connectionPoolGroup; }
         }
 
-        internal DbConnectionPoolGroupOptions PoolGroupOptions
+        internal override DbConnectionPoolGroupOptions PoolGroupOptions
         {
             get { return _connectionPoolGroupOptions; }
         }
 
-        internal DbConnectionPoolProviderInfo ProviderInfo
+        internal override DbConnectionPoolProviderInfo ProviderInfo
         {
             get { return _connectionPoolProviderInfo; }
         }
@@ -575,7 +554,7 @@ namespace Microsoft.Data.ProviderBase
         /// <summary>
         /// Return the pooled authentication contexts.
         /// </summary>
-        internal ConcurrentDictionary<DbConnectionPoolAuthenticationContextKey, DbConnectionPoolAuthenticationContext> AuthenticationContexts
+        internal override ConcurrentDictionary<DbConnectionPoolAuthenticationContextKey, DbConnectionPoolAuthenticationContext> AuthenticationContexts
         {
             get
             {
@@ -583,7 +562,7 @@ namespace Microsoft.Data.ProviderBase
             }
         }
 
-        internal bool UseLoadBalancing
+        internal override bool UseLoadBalancing
         {
             get { return PoolGroupOptions.UseLoadBalancing; }
         }
@@ -617,7 +596,7 @@ namespace Microsoft.Data.ProviderBase
 
             // Destroy free objects that put us above MinPoolSize from old stack.
             while (Count > MinPoolSize)
-            { 
+            {
                 // While above MinPoolSize...
                 if (_waitHandles.PoolSemaphore.WaitOne(0, false))
                 {
@@ -704,7 +683,7 @@ namespace Microsoft.Data.ProviderBase
             QueuePoolCreateRequest();
         }
 
-        internal void Clear()
+        internal override void Clear()
         {
             SqlClientEventSource.Log.TryPoolerTraceEvent("<prov.DbConnectionPool.Clear|RES|CPOOL> {0}, Clearing.", ObjectID);
             DbConnectionInternal obj;
@@ -825,20 +804,6 @@ namespace Microsoft.Data.ProviderBase
 #endif
                 }
 
-                // If the old connection belonged to another pool, we need to remove it from that
-                if (oldConnection != null)
-                {
-                    var oldConnectionPool = oldConnection.Pool;
-                    if (oldConnectionPool != null && oldConnectionPool != this)
-                    {
-                        Debug.Assert(oldConnectionPool._state == State.ShuttingDown, "Old connections pool should be shutting down");
-                        lock (oldConnectionPool._objectList)
-                        {
-                            oldConnectionPool._objectList.Remove(oldConnection);
-                            oldConnectionPool._totalObjects = oldConnectionPool._objectList.Count;
-                        }
-                    }
-                }
                 SqlClientEventSource.Log.TryPoolerTraceEvent("<prov.DbConnectionPool.CreateObject|RES|CPOOL> {0}, Connection {1}, Added to pool.", ObjectID, newObj?.ObjectID);
 
                 // Reset the error wait:
@@ -926,7 +891,7 @@ namespace Microsoft.Data.ProviderBase
             {
                 // NOTE: constructor should ensure that current state cannot be State.Initializing, so it can only
                 //   be State.Running or State.ShuttingDown
-                Debug.Assert(_state == State.Running || _state == State.ShuttingDown);
+                Debug.Assert(State == Running || State == ShuttingDown);
 
                 lock (obj)
                 {
@@ -936,7 +901,7 @@ namespace Microsoft.Data.ProviderBase
                     // transaction object will ensure that it is owned (not lost),
                     // and it will be certain to put it back into the pool.                    
 
-                    if (_state == State.ShuttingDown)
+                    if (State == ShuttingDown)
                     {
                         if (obj.IsTransactionRoot)
                         {
@@ -1039,7 +1004,7 @@ namespace Microsoft.Data.ProviderBase
             Debug.Assert(rootTxn == true || returnToGeneralPool == true || destroyObject == true);
         }
 
-        internal void DestroyObject(DbConnectionInternal obj)
+        internal override void DestroyObject(DbConnectionInternal obj)
         {
             // A connection with a delegated transaction cannot be disposed of
             // until the delegated transaction has actually completed.  Instead,
@@ -1219,7 +1184,7 @@ namespace Microsoft.Data.ProviderBase
             } while (_pendingOpens.TryPeek(out next));
         }
 
-        internal bool TryGetConnection(DbConnection owningObject, TaskCompletionSource<DbConnectionInternal> retry, DbConnectionOptions userOptions, out DbConnectionInternal connection)
+        internal override bool TryGetConnection(DbConnection owningObject, TaskCompletionSource<DbConnectionInternal> retry, DbConnectionOptions userOptions, out DbConnectionInternal connection)
         {
             uint waitForMultipleObjectsTimeout = 0;
             bool allowCreate = false;
@@ -1235,7 +1200,7 @@ namespace Microsoft.Data.ProviderBase
                 allowCreate = true;
             }
 
-            if (_state != State.Running)
+            if (State != Running)
             {
                 SqlClientEventSource.Log.TryPoolerTraceEvent("<prov.DbConnectionPool.GetConnection|RES|CPOOL> {0}, DbConnectionInternal State != Running.", ObjectID);
                 connection = null;
@@ -1425,17 +1390,17 @@ namespace Microsoft.Data.ProviderBase
                                 }
                                 break;
 
-                            case (WAIT_ABANDONED + SEMAPHORE_HANDLE):
+                            case WAIT_ABANDONED + SEMAPHORE_HANDLE:
                                 SqlClientEventSource.Log.TryPoolerTraceEvent("<prov.DbConnectionPool.GetConnection|RES|CPOOL> {0}, Semaphore handle abandonded.", ObjectID);
                                 Interlocked.Decrement(ref _waitCount);
                                 throw new AbandonedMutexException(SEMAPHORE_HANDLE, _waitHandles.PoolSemaphore);
 
-                            case (WAIT_ABANDONED + ERROR_HANDLE):
+                            case WAIT_ABANDONED + ERROR_HANDLE:
                                 SqlClientEventSource.Log.TryPoolerTraceEvent("<prov.DbConnectionPool.GetConnection|RES|CPOOL> {0}, Error handle abandonded.", ObjectID);
                                 Interlocked.Decrement(ref _waitCount);
                                 throw new AbandonedMutexException(ERROR_HANDLE, _waitHandles.ErrorEvent);
 
-                            case (WAIT_ABANDONED + CREATION_HANDLE):
+                            case WAIT_ABANDONED + CREATION_HANDLE:
                                 SqlClientEventSource.Log.TryPoolerTraceEvent("<prov.DbConnectionPool.GetConnection|RES|CPOOL> {0}, Creation handle abandoned.", ObjectID);
                                 Interlocked.Decrement(ref _waitCount);
                                 throw new AbandonedMutexException(CREATION_HANDLE, _waitHandles.CreationSemaphore);
@@ -1501,7 +1466,7 @@ namespace Microsoft.Data.ProviderBase
         /// <param name="userOptions">Options used to create the new connection</param>
         /// <param name="oldConnection">Inner connection that will be replaced</param>
         /// <returns>A new inner connection that is attached to the <paramref name="owningObject"/></returns>
-        internal DbConnectionInternal ReplaceConnection(DbConnection owningObject, DbConnectionOptions userOptions, DbConnectionInternal oldConnection)
+        internal override DbConnectionInternal ReplaceConnection(DbConnection owningObject, DbConnectionOptions userOptions, DbConnectionInternal oldConnection)
         {
 #if NETFRAMEWORK
             PerformanceCounters.SoftConnectsPerSecond.Increment();
@@ -1557,7 +1522,7 @@ namespace Microsoft.Data.ProviderBase
                 PerformanceCounters.NumberOfFreeConnections.Decrement();
 #endif
             }
-            return (obj);
+            return obj;
         }
 
         private DbConnectionInternal GetFromTransactedPool(out Transaction transaction)
@@ -1613,7 +1578,7 @@ namespace Microsoft.Data.ProviderBase
             long scopeID = SqlClientEventSource.Log.TryPoolerScopeEnterEvent("<prov.DbConnectionPool.PoolCreateRequest|RES|INFO|CPOOL> {0}", ObjectID);
             try
             {
-                if (State.Running == _state)
+                if (State == Running)
                 {
                     // in case WaitForPendingOpen ever failed with no subsequent OpenAsync calls,
                     // start it back up again
@@ -1737,7 +1702,7 @@ namespace Microsoft.Data.ProviderBase
             }
         }
 
-        internal void PutNewObject(DbConnectionInternal obj)
+        internal override void PutNewObject(DbConnectionInternal obj)
         {
             Debug.Assert(obj != null, "why are we adding a null object to the pool?");
 
@@ -1753,7 +1718,7 @@ namespace Microsoft.Data.ProviderBase
 
         }
 
-        internal void PutObject(DbConnectionInternal obj, object owningObject)
+        internal override void PutObject(DbConnectionInternal obj, object owningObject)
         {
             Debug.Assert(obj != null, "null obj?");
 
@@ -1785,7 +1750,7 @@ namespace Microsoft.Data.ProviderBase
             DeactivateObject(obj);
         }
 
-        internal void PutObjectFromTransactedPool(DbConnectionInternal obj)
+        internal override void PutObjectFromTransactedPool(DbConnectionInternal obj)
         {
             Debug.Assert(obj != null, "null pooledObject?");
             Debug.Assert(obj.EnlistedTransaction == null, "pooledObject is still enlisted?");
@@ -1802,7 +1767,7 @@ namespace Microsoft.Data.ProviderBase
             // done and all transactions are ended.
             SqlClientEventSource.Log.TryPoolerTraceEvent("<prov.DbConnectionPool.PutObjectFromTransactedPool|RES|CPOOL> {0}, Connection {1}, Transaction has ended.", ObjectID, obj.ObjectID);
 
-            if (_state == State.Running && obj.CanBePooled)
+            if (State == Running && obj.CanBePooled)
             {
                 PutNewObject(obj);
             }
@@ -1815,7 +1780,7 @@ namespace Microsoft.Data.ProviderBase
 
         private void QueuePoolCreateRequest()
         {
-            if (State.Running == _state)
+            if (State == Running)
             {
                 // Make sure we're at quota by posting a callback to the threadpool.
                 ThreadPool.QueueUserWorkItem(_poolCreateRequest);
@@ -1892,7 +1857,7 @@ namespace Microsoft.Data.ProviderBase
             return emancipatedObjectFound;
         }
 
-        internal void Startup()
+        internal override void Startup()
         {
             SqlClientEventSource.Log.TryPoolerTraceEvent("<prov.DbConnectionPool.Startup|RES|INFO|CPOOL> {0}, CleanupWait={1}", ObjectID, _cleanupWait);
             _cleanupTimer = CreateCleanupTimer();
@@ -1903,10 +1868,10 @@ namespace Microsoft.Data.ProviderBase
             }
         }
 
-        internal void Shutdown()
+        internal override void Shutdown()
         {
             SqlClientEventSource.Log.TryPoolerTraceEvent("<prov.DbConnectionPool.Shutdown|RES|INFO|CPOOL> {0}", ObjectID);
-            _state = State.ShuttingDown;
+            State = ShuttingDown;
 
             // deactivate timer callbacks
             Timer t = _cleanupTimer;
@@ -1921,7 +1886,7 @@ namespace Microsoft.Data.ProviderBase
         //   that is implemented inside DbConnectionPool. This method's counterpart (PutTransactedObject) should
         //   only be called from DbConnectionPool.DeactivateObject and thus the plumbing to provide access to 
         //   other objects is unnecessary (hence the asymmetry of Ended but no Begin)
-        internal void TransactionEnded(Transaction transaction, DbConnectionInternal transactedObject)
+        internal override void TransactionEnded(Transaction transaction, DbConnectionInternal transactedObject)
         {
             Debug.Assert(transaction != null, "null transaction?");
             Debug.Assert(transactedObject != null, "null transactedObject?");
