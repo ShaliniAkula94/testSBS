@@ -1,7 +1,7 @@
 version: 1
 metadata:
-  name: CBREInterfaceTest11
-  externalId: CBREInterfaceTest11
+  name: GithubActionsSaaS
+  externalId: GithubActionsSaaS
   description: |
     A microservice responsible for payment disputes.
     This service handles payment transaction disputes and is an integral part of our payment ecosystem.
